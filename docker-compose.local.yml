@@ -1,0 +1,406 @@
+version: '3.9'
+
+# ====================================================================================
+# LOCAL DEVELOPMENT DOCKER COMPOSE
+# ====================================================================================
+# This configuration is optimized for running on a developer's laptop with:
+# - 100% free and open source components
+# - Minimal resource requirements (8GB RAM)
+# - Simplified setup for non-technical users
+# ====================================================================================
+
+services:
+  # ====================
+  # FRONTEND (Next.js)
+  # ====================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: ims-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+  # ====================
+  # API GATEWAY
+  # ====================
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile.dev
+    container_name: ims-api-gateway
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth-service:5001
+      - INCIDENT_SERVICE_URL=http://incident-service:5002
+      - USER_SERVICE_URL=http://user-service:5003
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/node_modules
+    depends_on:
+      - redis
+      - auth-service
+      - incident-service
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+  # ====================
+  # MICROSERVICES
+  # ====================
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile.dev
+    container_name: ims-auth-service
+    ports:
+      - "5001:5001"
+    environment:
+      - NODE_ENV=development
+      - PORT=5001
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD:-devpassword}@postgres-auth:5432/auth_db
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./services/auth-service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres-auth
+      - redis
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+  incident-service:
+    build:
+      context: ./services/incident-service
+      dockerfile: Dockerfile.dev
+    container_name: ims-incident-service
+    ports:
+      - "5002:5002"
+    environment:
+      - NODE_ENV=development
+      - PORT=5002
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD:-devpassword}@postgres-incidents:5432/incidents_db
+      - OPENSEARCH_URL=http://opensearch:9200
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+    volumes:
+      - ./services/incident-service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres-incidents
+      - opensearch
+      - rabbitmq
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile.dev
+    container_name: ims-user-service
+    ports:
+      - "5003:5003"
+    environment:
+      - NODE_ENV=development
+      - PORT=5003
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD:-devpassword}@postgres-auth:5432/auth_db
+    volumes:
+      - ./services/user-service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres-auth
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile.dev
+    container_name: ims-notification-service
+    ports:
+      - "5004:5004"
+    environment:
+      - NODE_ENV=development
+      - PORT=5004
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD:-devpassword}@postgres-notifications:5432/notifications_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - SMTP_HOST=${SMTP_HOST:-mailhog}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+    volumes:
+      - ./services/notification-service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres-notifications
+      - rabbitmq
+      - mailhog
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+  file-storage-service:
+    build:
+      context: ./services/file-storage-service
+      dockerfile: Dockerfile.dev
+    container_name: ims-file-storage-service
+    ports:
+      - "5007:5007"
+    environment:
+      - NODE_ENV=development
+      - PORT=5007
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD:-devpassword}@postgres-files:5432/files_db
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_BUCKET=incident-attachments
+    volumes:
+      - ./services/file-storage-service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres-files
+      - minio
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+  # ====================
+  # DATABASES (PostgreSQL)
+  # ====================
+
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: ims-postgres-auth
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword}
+      - POSTGRES_DB=auth_db
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+    shm_size: 128mb
+
+  postgres-incidents:
+    image: postgres:15-alpine
+    container_name: ims-postgres-incidents
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword}
+      - POSTGRES_DB=incidents_db
+    volumes:
+      - postgres-incidents-data:/var/lib/postgresql/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+    shm_size: 128mb
+
+  postgres-notifications:
+    image: postgres:15-alpine
+    container_name: ims-postgres-notifications
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword}
+      - POSTGRES_DB=notifications_db
+    volumes:
+      - postgres-notifications-data:/var/lib/postgresql/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+    shm_size: 128mb
+
+  postgres-files:
+    image: postgres:15-alpine
+    container_name: ims-postgres-files
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword}
+      - POSTGRES_DB=files_db
+    volumes:
+      - postgres-files-data:/var/lib/postgresql/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+    shm_size: 128mb
+
+  # ====================
+  # REDIS (Caching & Sessions)
+  # ====================
+  # Using Redis 7.2 (BSD License - 100% Free)
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: ims-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ====================
+  # OPENSEARCH (Search Engine)
+  # ====================
+  # 100% Open Source (Apache 2.0) - Elasticsearch alternative
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: ims-opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_SECURITY_PLUGIN=true  # Simplified for local dev
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+  # ====================
+  # RABBITMQ (Message Broker)
+  # ====================
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ims-rabbitmq
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ====================
+  # MINIO (Object Storage)
+  # ====================
+  # S3-compatible storage for file attachments
+
+  minio:
+    image: minio/minio:latest
+    container_name: ims-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio-data:/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ====================
+  # MAILHOG (Email Testing)
+  # ====================
+  # Catches all emails for local development testing
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: ims-mailhog
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+  # ====================
+  # OPENSEARCH DASHBOARDS (Optional)
+  # ====================
+  # Web UI for OpenSearch (like Kibana for Elasticsearch)
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.0
+    container_name: ims-opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=http://opensearch:9200
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    depends_on:
+      - opensearch
+    networks:
+      - ims-network
+    restart: unless-stopped
+
+# ====================
+# VOLUMES
+# ====================
+volumes:
+  postgres-auth-data:
+  postgres-incidents-data:
+  postgres-notifications-data:
+  postgres-files-data:
+  redis-data:
+  opensearch-data:
+  rabbitmq-data:
+  minio-data:
+
+# ====================
+# NETWORKS
+# ====================
+networks:
+  ims-network:
+    driver: bridge

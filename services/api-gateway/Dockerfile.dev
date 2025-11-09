@@ -1,0 +1,20 @@
+# Development Dockerfile for API Gateway
+# This is simplified for local development with hot reload
+
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Expose port
+EXPOSE 4000
+
+# Development command (with hot reload)
+CMD ["npm", "run", "dev"]

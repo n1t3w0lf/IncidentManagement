@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useIncidentStore } from '@/stores/incidentStore';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Input, Select, Spinner } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Input, Select, SkeletonIncidentCard } from '@/components/ui';
 import { STATUS_CONFIG, SEVERITY_CONFIG } from '@/lib/constants';
 import { formatRelativeTime } from '@/lib/utils';
 import type { SearchFilters, IncidentStatus, IncidentSeverity } from '@/types';
@@ -127,8 +127,10 @@ export default function IncidentsListPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Spinner size="lg" />
+              <div className="space-y-4">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <SkeletonIncidentCard key={index} />
+                ))}
               </div>
             ) : incidents.length === 0 ? (
               <div className="text-center py-12">

@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useIncidentStore } from '@/stores/incidentStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, SkeletonDashboardStats, SkeletonIncidentCard } from '@/components/ui';
 import { STATUS_CONFIG, SEVERITY_CONFIG } from '@/lib/constants';
 import { formatRelativeTime } from '@/lib/utils';
 
@@ -48,6 +48,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Grid */}
+        {isLoading ? (
+          <SkeletonDashboardStats />
+        ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
@@ -113,6 +116,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* Two Column Layout */}
         <div className="grid gap-6 lg:grid-cols-2">
@@ -128,7 +132,11 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <p className="text-center text-gray-500 py-8">Loading...</p>
+                <div className="space-y-4">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <SkeletonIncidentCard key={index} />
+                  ))}
+                </div>
               ) : incidents.length === 0 ? (
                 <p className="text-center text-gray-500 py-8">No incidents yet</p>
               ) : (

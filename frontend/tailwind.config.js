@@ -61,6 +61,15 @@ module.exports = {
           950: '#052e16',
         },
       },
+      keyframes: {
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+      },
+      animation: {
+        shimmer: 'shimmer 2s infinite linear',
+      },
     },
   },
   plugins: [],

@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { useIncidentStore } from '@/stores/incidentStore';
 import { useAuthStore } from '@/stores/authStore';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Textarea, Alert, ConfirmDialog } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Textarea, Alert, ConfirmDialog, SkeletonIncidentDetail } from '@/components/ui';
 import { showToast } from '@/components/ui/Toast';
 import { STATUS_CONFIG, SEVERITY_CONFIG, ESCALATION_CONFIG } from '@/lib/constants';
 import { formatDateTime, formatRelativeTime } from '@/lib/utils';
@@ -101,12 +101,7 @@ export default function IncidentDetailPage() {
   if (isLoading || !currentIncident) {
     return (
       <DashboardLayout>
-        <div className="flex justify-center py-12">
-          <div className="text-center">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary-600 border-r-transparent"></div>
-            <p className="mt-4 text-gray-600">Loading incident...</p>
-          </div>
-        </div>
+        <SkeletonIncidentDetail />
       </DashboardLayout>
     );
   }

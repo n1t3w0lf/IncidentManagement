@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
+import type { IncidentStatus, IncidentSeverity } from '@/types';
 
 // ============================================
 // CLASS NAME UTILITY
@@ -218,6 +219,36 @@ export const generateTrackingId = (): string => {
 export const isValidTrackingId = (trackingId: string): boolean => {
   const trackingRegex = /^INC-\d{6}-[A-Z0-9]{4}$/;
   return trackingRegex.test(trackingId);
+};
+
+// ============================================
+// BADGE MAPPING UTILITIES
+// ============================================
+
+export const getStatusBadgeVariant = (status: IncidentStatus): 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info' => {
+  const mapping: Record<IncidentStatus, 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info'> = {
+    draft: 'default',
+    submitted: 'primary',
+    under_review: 'info',
+    investigating: 'info',
+    pending_approval: 'warning',
+    approved: 'success',
+    in_progress: 'primary',
+    resolved: 'success',
+    closed: 'default',
+    rejected: 'danger',
+  };
+  return mapping[status] || 'default';
+};
+
+export const getSeverityBadgeVariant = (severity: IncidentSeverity): 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info' => {
+  const mapping: Record<IncidentSeverity, 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info'> = {
+    low: 'success',
+    medium: 'info',
+    high: 'warning',
+    critical: 'danger',
+  };
+  return mapping[severity] || 'default';
 };
 
 // ============================================

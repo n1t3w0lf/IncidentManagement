@@ -49,7 +49,7 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (error) {
       // Error is handled by the store
-      console.error('Login failed:', error);
+      
     }
   };
 

@@ -30,7 +30,7 @@ export default function IncidentDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
-  const { currentIncident, fetchIncidentById, updateIncident, addComment, isLoading } = useIncidentStore();
+  const { currentIncident, fetchIncidentById, updateIncident, addComment, deleteIncident, isLoading } = useIncidentStore();
   const [comment, setComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [showSuccess, setShowSuccess] = useState(searchParams.get('success') === 'true');
@@ -43,6 +43,7 @@ export default function IncidentDetailPage() {
     action: null,
   });
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isDeletingIncident, setIsDeletingIncident] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -66,7 +67,6 @@ export default function IncidentDetailPage() {
       setComment('');
       showToast.success('Comment added successfully');
     } catch (error) {
-      console.error('Failed to add comment:', error);
       showToast.error('Failed to add comment. Please try again.');
     } finally {
       setIsSubmittingComment(false);
@@ -82,7 +82,6 @@ export default function IncidentDetailPage() {
       showToast.success(`Status updated to ${STATUS_CONFIG[newStatus as keyof typeof STATUS_CONFIG].label}`);
       setConfirmDialog({ ...confirmDialog, isOpen: false });
     } catch (error) {
-      console.error('Failed to update status:', error);
       showToast.error('Failed to update status. Please try again.');
     } finally {
       setIsUpdatingStatus(false);
@@ -113,6 +112,33 @@ export default function IncidentDetailPage() {
       confirmText: 'Confirm',
       confirmVariant: variant,
       action: () => handleStatusChange(newStatus),
+    });
+  };
+
+  const handleDeleteIncident = async () => {
+    if (!currentIncident) return;
+
+    setIsDeletingIncident(true);
+    try {
+      await deleteIncident(currentIncident.id);
+      showToast.success('Incident deleted successfully');
+      setConfirmDialog({ ...confirmDialog, isOpen: false });
+      // Redirect to incidents list
+      window.location.href = '/dashboard/incidents';
+    } catch (error) {
+      showToast.error('Failed to delete incident. Please try again.');
+      setIsDeletingIncident(false);
+    }
+  };
+
+  const confirmDeleteIncident = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Incident',
+      message: 'Are you sure you want to delete this incident? This action cannot be undone and all associated data will be permanently removed.',
+      confirmText: 'Delete Incident',
+      confirmVariant: 'danger',
+      action: handleDeleteIncident,
     });
   };
 
@@ -150,15 +176,30 @@ export default function IncidentDetailPage() {
 
         {/* Header */}
         <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{currentIncident.title}</h1>
-            <p className="mt-2 text-gray-600">
-              {currentIncident.trackingId && (
-                <span className="font-mono font-medium">Tracking ID: {currentIncident.trackingId}</span>
+          <div className="flex-1">
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">{currentIncident.title}</h1>
+                <p className="mt-2 text-gray-600">
+                  {currentIncident.trackingId && (
+                    <span className="font-mono font-medium">Tracking ID: {currentIncident.trackingId}</span>
+                  )}
+                </p>
+              </div>
+              {canEdit && (
+                <Link
+                  href={`/dashboard/incidents/${currentIncident.id}/edit`}
+                  className="btn-secondary ml-4"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit
+                </Link>
               )}
-            </p>
+            </div>
           </div>
-          <div className="flex flex-col items-end space-y-2">
+          <div className="flex flex-col items-end space-y-2 ml-4">
             <Badge
               variant={
                 currentIncident.severity === 'critical' ? 'danger' :
@@ -486,6 +527,38 @@ export default function IncidentDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Danger Zone */}
+            {(user?.role === 'admin' || user?.role === 'super_admin') && (
+              <Card className="border-danger-200">
+                <CardHeader>
+                  <CardTitle className="text-danger-700">Danger Zone</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md bg-danger-50 p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-danger-800">Delete this incident</h4>
+                        <p className="mt-1 text-sm text-danger-700">
+                          Once you delete an incident, there is no going back. All data will be permanently removed.
+                        </p>
+                      </div>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={confirmDeleteIncident}
+                        className="ml-4"
+                      >
+                        <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 
@@ -498,7 +571,7 @@ export default function IncidentDetailPage() {
           message={confirmDialog.message}
           confirmText={confirmDialog.confirmText}
           confirmVariant={confirmDialog.confirmVariant}
-          isLoading={isUpdatingStatus}
+          isLoading={isUpdatingStatus || isDeletingIncident}
         />
       </div>
     </DashboardLayout>

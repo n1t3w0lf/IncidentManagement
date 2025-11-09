@@ -94,7 +94,7 @@ export default function RegisterPage() {
       router.push('/dashboard');
     } catch (error) {
       // Error is handled by the store
-      console.error('Registration failed:', error);
+      
     }
   };
 

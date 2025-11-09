@@ -22,15 +22,6 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        {/* Info Alert */}
-        <Alert variant="info">
-          <p className="font-medium">Feature Under Development</p>
-          <p className="mt-1 text-sm">
-            The settings interface is currently being developed. This page will allow you to customize
-            system behavior, notification preferences, and organization-wide configurations.
-          </p>
-        </Alert>
-
         {/* Settings Categories */}
         <div className="grid gap-6 md:grid-cols-2">
           <Card>

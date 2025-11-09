@@ -30,6 +30,7 @@ interface IncidentState {
   isLoading: boolean;
   error: string | null;
   filters: SearchFilters;
+  selectedIncidents: string[];
 
   // Actions
   fetchIncidents: (params?: PaginationParams, filters?: SearchFilters) => Promise<void>;
@@ -43,6 +44,13 @@ interface IncidentState {
   clearFilters: () => void;
   clearError: () => void;
   clearCurrentIncident: () => void;
+
+  // Bulk actions
+  toggleSelectIncident: (id: string) => void;
+  toggleSelectAll: () => void;
+  clearSelection: () => void;
+  bulkDeleteIncidents: (ids: string[]) => Promise<void>;
+  bulkUpdateStatus: (ids: string[], status: string) => Promise<void>;
 }
 
 // ============================================
@@ -61,6 +69,7 @@ export const useIncidentStore = create<IncidentState>((set, get) => ({
   isLoading: false,
   error: null,
   filters: {},
+  selectedIncidents: [],
 
   // Fetch incidents
   fetchIncidents: async (params, filters) => {
@@ -328,6 +337,132 @@ export const useIncidentStore = create<IncidentState>((set, get) => ({
 
   // Clear current incident
   clearCurrentIncident: () => set({ currentIncident: null }),
+
+  // Toggle select incident
+  toggleSelectIncident: (id: string) => {
+    set((state) => ({
+      selectedIncidents: state.selectedIncidents.includes(id)
+        ? state.selectedIncidents.filter((incId) => incId !== id)
+        : [...state.selectedIncidents, id],
+    }));
+  },
+
+  // Toggle select all
+  toggleSelectAll: () => {
+    set((state) => {
+      const allSelected = state.selectedIncidents.length === state.incidents.length;
+      return {
+        selectedIncidents: allSelected ? [] : state.incidents.map((inc) => inc.id),
+      };
+    });
+  },
+
+  // Clear selection
+  clearSelection: () => {
+    set({ selectedIncidents: [] });
+  },
+
+  // Bulk delete incidents
+  bulkDeleteIncidents: async (ids: string[]) => {
+    set({ isLoading: true, error: null });
+
+    const tokens = useAuthStore.getState().tokens;
+
+    try {
+      // Delete all incidents in parallel
+      const deletePromises = ids.map((id) =>
+        fetch(`${API_URL}/incidents/${id}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${tokens?.accessToken}`,
+          },
+        })
+      );
+
+      const responses = await Promise.all(deletePromises);
+      const failures: string[] = [];
+
+      // Check for failures
+      responses.forEach((response, index) => {
+        if (!response.ok) {
+          failures.push(ids[index]);
+        }
+      });
+
+      if (failures.length > 0) {
+        throw new Error(`Failed to delete ${failures.length} incident(s)`);
+      }
+
+      // Remove from incidents list
+      set((state) => ({
+        incidents: state.incidents.filter((inc) => !ids.includes(inc.id)),
+        selectedIncidents: [],
+        isLoading: false,
+      }));
+    } catch (error: any) {
+      set({
+        isLoading: false,
+        error: error.message,
+      });
+      throw error;
+    }
+  },
+
+  // Bulk update status
+  bulkUpdateStatus: async (ids: string[], status: string) => {
+    set({ isLoading: true, error: null });
+
+    const tokens = useAuthStore.getState().tokens;
+
+    try {
+      // Update all incidents in parallel
+      const updatePromises = ids.map((id) =>
+        fetch(`${API_URL}/incidents/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokens?.accessToken}`,
+          },
+          body: JSON.stringify({ status }),
+        })
+      );
+
+      const responses = await Promise.all(updatePromises);
+      const updatedData: Incident[] = [];
+      const failures: string[] = [];
+
+      // Collect results
+      for (let i = 0; i < responses.length; i++) {
+        const response = responses[i];
+        if (response.ok) {
+          const data = await response.json();
+          updatedData.push(data.data);
+        } else {
+          failures.push(ids[i]);
+        }
+      }
+
+      if (failures.length > 0) {
+        throw new Error(`Failed to update ${failures.length} incident(s)`);
+      }
+
+      // Update in incidents list
+      set((state) => ({
+        incidents: state.incidents.map((inc) => {
+          const updated = updatedData.find((u) => u.id === inc.id);
+          return updated || inc;
+        }),
+        selectedIncidents: [],
+        isLoading: false,
+      }));
+    } catch (error: any) {
+      set({
+        isLoading: false,
+        error: error.message,
+      });
+      throw error;
+    }
+  },
 }));
 
 // ============================================

@@ -8,15 +8,33 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useIncidentStore } from '@/stores/incidentStore';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Input, Select, SkeletonIncidentCard } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Input, Select, SkeletonIncidentCard, Pagination } from '@/components/ui';
 import { STATUS_CONFIG, SEVERITY_CONFIG } from '@/lib/constants';
 import { formatRelativeTime } from '@/lib/utils';
 import type { SearchFilters, IncidentStatus, IncidentSeverity } from '@/types';
 
 export default function IncidentsListPage() {
-  const { incidents, fetchIncidents, isLoading, total, page, limit, totalPages, setFilters, filters } = useIncidentStore();
+  const {
+    incidents,
+    fetchIncidents,
+    isLoading,
+    total,
+    page,
+    limit,
+    totalPages,
+    setFilters,
+    filters,
+    selectedIncidents,
+    toggleSelectIncident,
+    toggleSelectAll,
+    clearSelection,
+    bulkDeleteIncidents,
+    bulkUpdateStatus,
+  } = useIncidentStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [localFilters, setLocalFilters] = useState<SearchFilters>({});
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [bulkActionStatus, setBulkActionStatus] = useState<string>('');
 
   useEffect(() => {
     fetchIncidents({ page: 1, limit: 25, sortBy: 'createdAt', sortOrder: 'desc' });
@@ -47,6 +65,42 @@ export default function IncidentsListPage() {
     fetchIncidents({ page: newPage, limit: 25, sortBy: 'createdAt', sortOrder: 'desc' });
   };
 
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedIncidents.length} incident(s)?`)) {
+      return;
+    }
+
+    try {
+      await bulkDeleteIncidents(selectedIncidents);
+      // Refresh the list
+      await fetchIncidents({ page, limit: 25, sortBy: 'createdAt', sortOrder: 'desc' });
+    } catch (error) {
+      // Error is already set in store
+    }
+  };
+
+  const handleBulkStatusUpdate = async () => {
+    if (!bulkActionStatus) {
+      alert('Please select a status');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to update ${selectedIncidents.length} incident(s) to ${bulkActionStatus}?`)) {
+      return;
+    }
+
+    try {
+      await bulkUpdateStatus(selectedIncidents, bulkActionStatus);
+      setBulkActionStatus('');
+      // Refresh the list
+      await fetchIncidents({ page, limit: 25, sortBy: 'createdAt', sortOrder: 'desc' });
+    } catch (error) {
+      // Error is already set in store
+    }
+  };
+
+  const isAllSelected = incidents.length > 0 && selectedIncidents.length === incidents.length;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -62,6 +116,73 @@ export default function IncidentsListPage() {
             Report New Incident
           </Link>
         </div>
+
+        {/* Bulk Actions Toolbar */}
+        {selectedIncidents.length > 0 && (
+          <Card className="border-primary-500 bg-primary-50">
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <span className="font-semibold text-gray-900">
+                    {selectedIncidents.length} incident{selectedIncidents.length !== 1 ? 's' : ''} selected
+                  </span>
+                  <Button variant="secondary" size="sm" onClick={clearSelection}>
+                    Clear Selection
+                  </Button>
+                </div>
+                <div className="flex items-center space-x-3">
+                  {!showBulkActions ? (
+                    <>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setShowBulkActions(true)}
+                      >
+                        Update Status
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                      >
+                        Delete Selected
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Select
+                        value={bulkActionStatus}
+                        onChange={(e) => setBulkActionStatus(e.target.value)}
+                        options={Object.entries(STATUS_CONFIG).map(([value, config]) => ({
+                          value,
+                          label: config.label,
+                        }))}
+                        className="w-48"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleBulkStatusUpdate}
+                        disabled={!bulkActionStatus}
+                      >
+                        Apply Status
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setShowBulkActions(false);
+                          setBulkActionStatus('');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Filters */}
         <Card>
@@ -117,9 +238,22 @@ export default function IncidentsListPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>
-                {total} Incident{total !== 1 ? 's' : ''}
-              </CardTitle>
+              <div className="flex items-center space-x-4">
+                {incidents.length > 0 && (
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Select All</span>
+                  </label>
+                )}
+                <CardTitle>
+                  {total} Incident{total !== 1 ? 's' : ''}
+                </CardTitle>
+              </div>
               <p className="text-sm text-gray-500">
                 Page {page} of {totalPages}
               </p>
@@ -152,82 +286,89 @@ export default function IncidentsListPage() {
             ) : (
               <div className="space-y-4">
                 {incidents.map((incident) => (
-                  <Link
+                  <div
                     key={incident.id}
-                    href={`/dashboard/incidents/${incident.id}`}
-                    className="block rounded-lg border p-4 hover:border-primary-300 hover:bg-primary-50 transition-colors"
+                    className="flex items-start space-x-3 rounded-lg border p-4 hover:border-primary-300 hover:bg-primary-50 transition-colors"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3">
-                          <h3 className="text-lg font-semibold text-gray-900 truncate">
-                            {incident.title}
-                          </h3>
-                          {incident.trackingId && (
-                            <span className="text-xs font-mono text-gray-500">
-                              {incident.trackingId}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-sm text-gray-600 line-clamp-2">
-                          {incident.description}
-                        </p>
-                        <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
-                          <span className="capitalize">{incident.category.type}</span>
-                          <span>•</span>
-                          <span>{incident.category.name}</span>
-                          <span>•</span>
-                          <span>{formatRelativeTime(incident.createdAt)}</span>
-                        </div>
-                      </div>
-                      <div className="ml-4 flex flex-col items-end space-y-2">
-                        <Badge
-                          variant={
-                            incident.severity === 'critical' ? 'danger' :
-                            incident.severity === 'high' ? 'warning' :
-                            incident.severity === 'medium' ? 'info' : 'success'
-                          }
-                        >
-                          {SEVERITY_CONFIG[incident.severity].label}
-                        </Badge>
-                        <Badge
-                          variant={
-                            incident.status === 'closed' || incident.status === 'resolved' ? 'success' :
-                            incident.status === 'rejected' ? 'danger' :
-                            incident.status === 'pending_approval' ? 'warning' : 'primary'
-                          }
-                        >
-                          {STATUS_CONFIG[incident.status].label}
-                        </Badge>
-                      </div>
+                    {/* Checkbox */}
+                    <div className="pt-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedIncidents.includes(incident.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          toggleSelectIncident(incident.id);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
                     </div>
-                  </Link>
+
+                    {/* Incident Content - Clickable */}
+                    <Link
+                      href={`/dashboard/incidents/${incident.id}`}
+                      className="flex-1 min-w-0"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-3">
+                            <h3 className="text-lg font-semibold text-gray-900 truncate">
+                              {incident.title}
+                            </h3>
+                            {incident.trackingId && (
+                              <span className="text-xs font-mono text-gray-500">
+                                {incident.trackingId}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm text-gray-600 line-clamp-2">
+                            {incident.description}
+                          </p>
+                          <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
+                            <span className="capitalize">{incident.category.type}</span>
+                            <span>•</span>
+                            <span>{incident.category.name}</span>
+                            <span>•</span>
+                            <span>{formatRelativeTime(incident.createdAt)}</span>
+                          </div>
+                        </div>
+                        <div className="ml-4 flex flex-col items-end space-y-2">
+                          <Badge
+                            variant={
+                              incident.severity === 'critical' ? 'danger' :
+                              incident.severity === 'high' ? 'warning' :
+                              incident.severity === 'medium' ? 'info' : 'success'
+                            }
+                          >
+                            {SEVERITY_CONFIG[incident.severity].label}
+                          </Badge>
+                          <Badge
+                            variant={
+                              incident.status === 'closed' || incident.status === 'resolved' ? 'success' :
+                              incident.status === 'rejected' ? 'danger' :
+                              incident.status === 'pending_approval' ? 'warning' : 'primary'
+                            }
+                          >
+                            {STATUS_CONFIG[incident.status].label}
+                          </Badge>
+                        </div>
+                      </div>
+                    </Link>
+                  </div>
                 ))}
               </div>
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="mt-6 flex items-center justify-between border-t pt-4">
-                <Button
-                  variant="secondary"
-                  disabled={page === 1}
-                  onClick={() => handlePageChange(page - 1)}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-gray-700">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  disabled={page === totalPages}
-                  onClick={() => handlePageChange(page + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
+            <div className="mt-6">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                isLoading={isLoading}
+                sticky={true}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>

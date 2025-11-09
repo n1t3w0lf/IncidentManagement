@@ -40,15 +40,6 @@ export default function UsersPage() {
           </p>
         </div>
 
-        {/* Info Alert */}
-        <Alert variant="info">
-          <p className="font-medium">Feature Under Development</p>
-          <p className="mt-1 text-sm">
-            The user management interface is currently being developed. This page will allow administrators
-            to create, edit, and manage user accounts, roles, and permissions.
-          </p>
-        </Alert>
-
         {/* Planned Features */}
         <Card>
           <CardHeader>

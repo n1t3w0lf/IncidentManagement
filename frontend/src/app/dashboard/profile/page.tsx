@@ -4,12 +4,25 @@
 // USER PROFILE PAGE
 // ============================================
 
+import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Button } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function ProfilePage() {
   const { user, organization } = useAuthStore();
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    emailNotifications: true,
+    inAppNotifications: true,
+    criticalAlerts: true,
+  });
+
+  const toggleNotificationPref = (key: keyof typeof notificationPrefs) => {
+    setNotificationPrefs((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
 
   if (!user) {
     return (
@@ -32,15 +45,6 @@ export default function ProfilePage() {
             View and manage your personal account information
           </p>
         </div>
-
-        {/* Info Alert */}
-        <Alert variant="info">
-          <p className="font-medium">Feature Under Development</p>
-          <p className="mt-1 text-sm">
-            The profile editing interface is currently being developed. This page will allow you to
-            update your personal information, change your password, and manage notification preferences.
-          </p>
-        </Alert>
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Profile Info - Main Column */}
@@ -156,7 +160,19 @@ export default function ProfilePage() {
                         <p className="text-sm font-medium text-gray-900">Email Notifications</p>
                         <p className="text-xs text-gray-500">Receive updates via email</p>
                       </div>
-                      <Badge variant="default">Coming Soon</Badge>
+                      <button
+                        type="button"
+                        onClick={() => toggleNotificationPref('emailNotifications')}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          notificationPrefs.emailNotifications ? 'bg-primary-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            notificationPrefs.emailNotifications ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
                     </div>
 
                     <div className="flex items-center justify-between rounded-lg border p-4">
@@ -164,7 +180,19 @@ export default function ProfilePage() {
                         <p className="text-sm font-medium text-gray-900">In-App Notifications</p>
                         <p className="text-xs text-gray-500">Get notified within the application</p>
                       </div>
-                      <Badge variant="default">Coming Soon</Badge>
+                      <button
+                        type="button"
+                        onClick={() => toggleNotificationPref('inAppNotifications')}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          notificationPrefs.inAppNotifications ? 'bg-primary-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            notificationPrefs.inAppNotifications ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
                     </div>
 
                     <div className="flex items-center justify-between rounded-lg border p-4">
@@ -172,8 +200,26 @@ export default function ProfilePage() {
                         <p className="text-sm font-medium text-gray-900">Critical Alerts</p>
                         <p className="text-xs text-gray-500">Immediate notifications for critical incidents</p>
                       </div>
-                      <Badge variant="default">Coming Soon</Badge>
+                      <button
+                        type="button"
+                        onClick={() => toggleNotificationPref('criticalAlerts')}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          notificationPrefs.criticalAlerts ? 'bg-primary-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            notificationPrefs.criticalAlerts ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
                     </div>
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <Button variant="primary">
+                      Save Preferences
+                    </Button>
                   </div>
                 </div>
               </CardContent>

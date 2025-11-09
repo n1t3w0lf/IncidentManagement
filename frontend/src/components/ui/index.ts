@@ -11,3 +11,5 @@ export * from './Spinner';
 export * from './Toast';
 export * from './ConfirmDialog';
 export * from './Skeleton';
+export * from './FormProgressIndicator';
+export * from './Pagination';

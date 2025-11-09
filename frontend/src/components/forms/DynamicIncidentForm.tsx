@@ -4,8 +4,8 @@
 // DYNAMIC INCIDENT FORM
 // ============================================
 
-import { useState, useEffect, useRef } from 'react';
-import { Input, Textarea, Select, Button, Alert } from '@/components/ui';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Input, Textarea, Select, Button, Alert, FormProgressIndicator } from '@/components/ui';
 import { ALL_INCIDENT_CATEGORIES } from '@/lib/categories';
 import { INDUSTRY_TYPES } from '@/lib/constants';
 import type { Incident, IncidentCategory, CustomField, IndustryType, IncidentSeverity } from '@/types';
@@ -41,6 +41,50 @@ export function DynamicIncidentForm({
   const availableCategories = selectedIndustry
     ? ALL_INCIDENT_CATEGORIES.filter((cat) => cat.type === selectedIndustry)
     : [];
+
+  // Calculate form progress
+  const formProgress = useMemo(() => {
+    const sections: { name: string; completed: boolean }[] = [];
+
+    // Section 1: Industry & Category
+    sections.push({
+      name: 'Industry & Category',
+      completed: !!selectedIndustry && !!selectedCategory,
+    });
+
+    // Section 2: Reporter Info (if applicable)
+    if (showReporterInfo && reporterType === 'guest') {
+      sections.push({
+        name: 'Your Information',
+        completed: !!formData.reporterInfo.name && !!formData.reporterInfo.email,
+      });
+    }
+
+    // Section 3: Basic Details
+    if (selectedCategory) {
+      sections.push({
+        name: 'Incident Details',
+        completed: !!formData.title.trim() && !!formData.description.trim() && !!formData.severity,
+      });
+
+      // Section 4: Custom Fields
+      if (selectedCategory.customFields && selectedCategory.customFields.length > 0) {
+        const requiredCustomFields = selectedCategory.customFields.filter((f) => f.required);
+        const completedCustomFields = requiredCustomFields.filter(
+          (f) => formData.customFields[f.id]
+        );
+
+        sections.push({
+          name: 'Additional Information',
+          completed:
+            requiredCustomFields.length === 0 ||
+            completedCustomFields.length === requiredCustomFields.length,
+        });
+      }
+    }
+
+    return sections;
+  }, [selectedIndustry, selectedCategory, formData, showReporterInfo, reporterType]);
 
   useEffect(() => {
     // Reset category when industry changes
@@ -435,7 +479,16 @@ export function DynamicIncidentForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Progress Indicator - Desktop Sidebar */}
+      {formProgress.length > 0 && (
+        <div className="hidden lg:block lg:col-span-1">
+          <FormProgressIndicator sections={formProgress} />
+        </div>
+      )}
+
+      {/* Main Form */}
+      <form onSubmit={handleSubmit} className={`space-y-6 ${formProgress.length > 0 ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
       {/* Industry Selection */}
       <Select
         label="Select Industry"
@@ -624,6 +677,14 @@ export function DynamicIncidentForm({
           </div>
         </>
       )}
+
+      {/* Mobile Progress Indicator */}
+      {formProgress.length > 0 && (
+        <div className="lg:hidden mt-6 p-4 bg-gray-50 rounded-lg border">
+          <FormProgressIndicator sections={formProgress} className="!sticky !top-0 !shadow-none !border-0 !p-0 !bg-transparent" />
+        </div>
+      )}
     </form>
+    </div>
   );
 }

@@ -19,15 +19,6 @@ export default function AnalyticsPage() {
           </p>
         </div>
 
-        {/* Info Alert */}
-        <Alert variant="info">
-          <p className="font-medium">Feature Under Development</p>
-          <p className="mt-1 text-sm">
-            The analytics dashboard is currently being developed. This page will provide comprehensive
-            metrics, trends, and insights across all incident categories and industries.
-          </p>
-        </Alert>
-
         {/* Planned Analytics */}
         <div className="grid gap-6 md:grid-cols-2">
           <Card>

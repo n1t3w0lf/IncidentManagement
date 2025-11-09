@@ -1,491 +1,491 @@
-# PROMPT 1: PROJECT SETUP & FOUNDATION (LOCAL-ONLY ARCHITECTURE)
+# PROMPT 1: PROJECT SETUP & FOUNDATION (MSW Microservices)
 
 ## Brief Description
-This prompt sets up a complete **LOCAL-ONLY** incident management system with zero cloud dependencies. The system uses SQLite for data storage, runs entirely on localhost, and requires no paid services or external APIs. Perfect for junior developers with step-by-step instructions.
+This prompt sets up a complete **frontend-first** incident management system using **Mock Service Worker (MSW)** to simulate microservices architecture for rapid prototyping. All data persists in localStorage for testing. Perfect for junior developers with step-by-step instructions.
 
 ## Expert Review Summary
-- **System Architect (David Park):** Verified for local-only deployment, zero-config database
+- **System Architect (David Park):** Verified MSW microservices pattern for rapid prototyping
 - **Target User:** Junior developer on local development machine
-- **Key Principle:** Everything must work offline with single command startup
+- **Key Principle:** Frontend-first with MSW, all test data persists in localStorage
+- **Architecture:** Microservices pattern with separate MSW handlers per domain
 
 ## Prerequisites
 - Node.js 18+ installed (verify with: `node --version`)
 - npm or yarn package manager (verify with: `npm --version`)
-- VS Code or any code editor
-- Git installed (verify with: `git --version`)
-- **NO cloud accounts needed**
-- **NO paid services required**
+- VS Code or similar code editor
+- Basic understanding of terminal/command line
+- **NO backend server needed** - MSW handles all API calls
+- **NO cloud services** - everything runs in browser
 
 ---
 
 ## AI PROMPT
 
 ```
-You are a senior full-stack developer helping a JUNIOR developer set up a local-only incident management system. This system will run entirely on localhost with NO cloud dependencies, NO paid services, and NO external APIs.
+You are a senior full-stack developer helping a JUNIOR developer set up a modern incident management system using MSW (Mock Service Worker) microservices pattern for rapid prototyping. This system runs entirely in the browser with NO backend server required.
 
-CRITICAL REQUIREMENTS FOR LOCAL-ONLY DEPLOYMENT:
-1. Backend: Node.js + Express (runs on localhost:3001)
-2. Frontend: Next.js + React (runs on localhost:3000)
-3. Database: SQLite (file-based, zero configuration)
-4. Authentication: JWT with local secrets (no Auth0, no Firebase)
-5. File Storage: Local file system (no AWS S3, no cloud storage)
-6. Everything starts with ONE command: npm run dev
+CRITICAL ARCHITECTURE PRINCIPLES:
+1. Frontend: Next.js + React (runs on localhost:3000)
+2. API Mocking: MSW (Mock Service Worker) - intercepts API calls in browser
+3. Data Storage: localStorage - all test data persists automatically
+4. Microservices Pattern: Separate MSW handlers for each domain (Auth, Incidents, Users, etc.)
+5. Rapid Prototyping: Changes to MSW handlers = instant API changes
+6. Zero Backend: No server setup, no database, no backend code
 
 ---
 
-## STEP 1: Create Project Structure
-
-Run these commands EXACTLY as shown:
+## STEP 1: Environment Setup
 
 ```bash
-# Create project directory
-mkdir incident-management
+# Verify Node.js 18+
+node --version
+# Should show v18.0.0 or higher
+
+npm --version
+# Should show 8.0.0 or higher
+```
+
+**What this checks:** Node.js is required to run the development server and npm manages packages.
+
+**If not installed:** Download from https://nodejs.org/
+
+---
+
+## STEP 2: Create Next.js Project
+
+```bash
+# Create project with TypeScript and Tailwind
+npx create-next-app@latest incident-management --typescript --tailwind --app --src-dir --import-alias "@/*"
+
+# Navigate into project
 cd incident-management
-
-# Initialize git repository
-git init
-
-# Create main directories
-mkdir backend frontend
-
-# Create .gitignore file
-cat > .gitignore << 'EOF'
-node_modules/
-.env
-.env.local
-*.log
-.next/
-dist/
-build/
-database.sqlite
-database.sqlite-journal
-uploads/
-*.db
-.DS_Store
-EOF
-```
-
-**What this does:** Creates the basic project structure with backend and frontend separated. The .gitignore prevents sensitive files and build artifacts from being committed to git.
-
----
-
-## STEP 2: Backend Setup (Node.js + Express + SQLite)
-
-### 2.1 Initialize Backend
-
-```bash
-cd backend
-
-# Initialize npm project
-npm init -y
-
-# Install backend dependencies
-npm install express cors dotenv jsonwebtoken bcryptjs
-npm install sqlite3 better-sqlite3
-npm install express-validator multer
-npm install uuid date-fns
-
-# Install development dependencies
-npm install --save-dev nodemon @types/node @types/express typescript ts-node
-```
-
-**What each package does:**
-- **express:** Web server framework
-- **cors:** Allows frontend to talk to backend
-- **dotenv:** Loads environment variables from .env file
-- **jsonwebtoken:** Creates authentication tokens (local, no cloud)
-- **bcryptjs:** Encrypts passwords securely
-- **better-sqlite3:** Fast, synchronous SQLite database (zero configuration)
-- **express-validator:** Validates user input
-- **multer:** Handles file uploads to local disk
-- **uuid, date-fns:** Utility libraries
-- **nodemon, typescript:** Development tools for auto-reload and type safety
-
-### 2.2 Create Backend File Structure
-
-```bash
-# Still in backend directory
-mkdir -p src/config
-mkdir -p src/routes
-mkdir -p src/controllers
-mkdir -p src/models
-mkdir -p src/middleware
-mkdir -p src/database
-mkdir -p src/utils
-mkdir -p uploads
-```
-
-**What each directory is for:**
-- **config:** Configuration files (database setup, environment variables)
-- **routes:** API endpoint definitions (like /api/incidents, /api/auth)
-- **controllers:** Business logic for handling requests
-- **models:** Database table schemas and data access
-- **middleware:** Authentication checks, validation
-- **database:** Database initialization and migration scripts
-- **utils:** Helper functions
-- **uploads:** Where uploaded files are stored (local disk)
-
-### 2.3 Create Backend Configuration Files
-
-Create `backend/tsconfig.json`:
-```json
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": ["ES2020"],
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "moduleResolution": "node"
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
-}
-```
-
-**What this does:** Configures TypeScript to compile our backend code with strict type checking.
-
-Create `backend/.env.example`:
-```env
-# Server Configuration
-PORT=3001
-NODE_ENV=development
-
-# Database (local SQLite file)
-DATABASE_PATH=./database.sqlite
-
-# JWT Secret (change this to a random string)
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-JWT_EXPIRES_IN=24h
-JWT_REFRESH_EXPIRES_IN=7d
-
-# File Upload Configuration (local storage)
-UPLOAD_DIR=./uploads
-MAX_FILE_SIZE=10485760
-
-# CORS (allow frontend to connect)
-CORS_ORIGIN=http://localhost:3000
-```
-
-**Important:** Copy this to `backend/.env` and change JWT_SECRET to a random string.
-
-```bash
-cp .env.example .env
-```
-
-### 2.4 Create Database Initialization Script
-
-Create `backend/src/database/init.ts`:
-```typescript
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
-
-const DB_PATH = process.env.DATABASE_PATH || './database.sqlite';
-
-// Create database directory if it doesn't exist
-const dbDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-
-// Initialize database
-export const db = new Database(DB_PATH, {
-  verbose: console.log // Shows SQL queries in console for debugging
-});
-
-// Enable foreign keys
-db.pragma('foreign_keys = ON');
-
-// Create tables
-export function initializeDatabase() {
-  console.log('🗄️  Initializing database...');
-
-  // Organizations table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS organizations (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('corporate', 'healthcare', 'mining')),
-      settings TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 1
-    )
-  `);
-
-  // Users table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      role_id TEXT NOT NULL,
-      organization_id TEXT NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL,
-      last_login_at TEXT,
-      FOREIGN KEY (organization_id) REFERENCES organizations(id)
-    )
-  `);
-
-  // Incidents table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS incidents (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      description TEXT NOT NULL,
-      severity TEXT NOT NULL CHECK(severity IN ('low', 'medium', 'high', 'critical')),
-      status TEXT NOT NULL CHECK(status IN ('draft', 'submitted', 'under_review', 'investigating', 'pending_approval', 'approved', 'in_progress', 'resolved', 'closed', 'rejected')),
-      category_id TEXT NOT NULL,
-      reporter_type TEXT NOT NULL CHECK(reporter_type IN ('anonymous', 'guest', 'user')),
-      reporter_info TEXT NOT NULL,
-      organization_id TEXT,
-      location TEXT,
-      tags TEXT,
-      custom_fields TEXT,
-      tracking_id TEXT UNIQUE NOT NULL,
-      assigned_to TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      due_date TEXT,
-      FOREIGN KEY (organization_id) REFERENCES organizations(id)
-    )
-  `);
-
-  // Incident timeline table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS incident_timeline (
-      id TEXT PRIMARY KEY,
-      incident_id TEXT NOT NULL,
-      action TEXT NOT NULL,
-      description TEXT NOT NULL,
-      performed_by TEXT NOT NULL,
-      performed_at TEXT NOT NULL,
-      metadata TEXT,
-      FOREIGN KEY (incident_id) REFERENCES incidents(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Attachments table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS attachments (
-      id TEXT PRIMARY KEY,
-      incident_id TEXT NOT NULL,
-      filename TEXT NOT NULL,
-      original_name TEXT NOT NULL,
-      file_type TEXT NOT NULL,
-      file_size INTEGER NOT NULL,
-      file_path TEXT NOT NULL,
-      uploaded_at TEXT NOT NULL,
-      uploaded_by TEXT NOT NULL,
-      description TEXT,
-      FOREIGN KEY (incident_id) REFERENCES incidents(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Refresh tokens table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS refresh_tokens (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      token TEXT UNIQUE NOT NULL,
-      expires_at TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Create indexes for better query performance
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_incidents_tracking_id ON incidents(tracking_id);
-    CREATE INDEX IF NOT EXISTS idx_incidents_organization_id ON incidents(organization_id);
-    CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
-    CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity);
-    CREATE INDEX IF NOT EXISTS idx_incidents_created_at ON incidents(created_at);
-    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-    CREATE INDEX IF NOT EXISTS idx_users_organization_id ON users(organization_id);
-    CREATE INDEX IF NOT EXISTS idx_timeline_incident_id ON incident_timeline(incident_id);
-    CREATE INDEX IF NOT EXISTS idx_attachments_incident_id ON attachments(incident_id);
-  `);
-
-  console.log('✅ Database initialized successfully!');
-}
-
-// Run initialization
-initializeDatabase();
 ```
 
 **What this does:**
-- Creates a SQLite database file on your local disk
-- Sets up all tables needed for the application
-- Creates indexes to make searches faster
-- **No cloud, no configuration needed** - just works!
+- `create-next-app@latest` - Creates a Next.js 14+ project
+- `--typescript` - Enables TypeScript (type safety)
+- `--tailwind` - Includes Tailwind CSS (styling)
+- `--app` - Uses new App Router (modern Next.js)
+- `--src-dir` - Puts code in `src/` folder (cleaner structure)
+- `--import-alias "@/*"` - Allows imports like `@/components/Button`
 
-### 2.5 Update package.json Scripts
-
-Edit `backend/package.json` and replace the `scripts` section:
-
-```json
-{
-  "scripts": {
-    "dev": "nodemon --exec ts-node src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "db:init": "ts-node src/database/init.ts",
-    "db:reset": "rm -f database.sqlite && npm run db:init"
-  }
-}
+**Expected output:**
 ```
-
-**What each script does:**
-- **dev:** Starts development server with auto-reload
-- **build:** Compiles TypeScript to JavaScript
-- **start:** Runs production server
-- **db:init:** Creates database tables
-- **db:reset:** Deletes database and recreates it (useful for development)
+Creating a new Next.js app in /path/to/incident-management
+Installing dependencies...
+Success! Created incident-management
+```
 
 ---
 
-## STEP 3: Frontend Setup (Next.js + React)
+## STEP 3: Install Dependencies
 
 ```bash
-# Go back to project root
-cd ..
+# Core dependencies for state management and forms
+npm install zustand react-hook-form @hookform/resolvers zod
 
-# Create Next.js frontend
-npx create-next-app@latest frontend --typescript --tailwind --app --src-dir --import-alias "@/*"
+# UI components and icons
+npm install lucide-react @headlessui/react @heroicons/react clsx class-variance-authority
 
-cd frontend
+# Utilities
+npm install date-fns uuid @types/uuid react-hot-toast
 
-# Install additional dependencies
-npm install zustand
-npm install react-hook-form @hookform/resolvers zod
-npm install @tanstack/react-query
-npm install axios
-npm install date-fns uuid
-npm install lucide-react
-npm install react-hot-toast
+# MSW for API mocking (THE KEY DEPENDENCY!)
+npm install --save-dev msw
 
-# Install dev dependencies
-npm install --save-dev @types/uuid
+# Development tools
+npm install --save-dev @types/node @typescript-eslint/eslint-plugin @typescript-eslint/parser
+npm install --save-dev @testing-library/react @testing-library/jest-dom vitest @vitejs/plugin-react jsdom
 ```
 
 **What each package does:**
-- **zustand:** Simple state management (replaces Redux)
-- **react-hook-form + zod:** Form handling and validation
-- **@tanstack/react-query:** Data fetching and caching
-- **axios:** HTTP requests to backend
-- **date-fns, uuid:** Utility libraries
-- **lucide-react:** Icon library
-- **react-hot-toast:** Toast notifications
 
-### 3.1 Create Frontend File Structure
+**State Management & Forms:**
+- `zustand` - Simple state management (like Redux but easier)
+- `react-hook-form` - Form handling with validation
+- `@hookform/resolvers` + `zod` - Schema validation for forms
+
+**UI Components:**
+- `lucide-react` - Modern icon library
+- `@headlessui/react` - Accessible UI components
+- `@heroicons/react` - Hero icons
+- `clsx` + `class-variance-authority` - CSS class utilities
+
+**Utilities:**
+- `date-fns` - Date formatting
+- `uuid` - Generate unique IDs
+- `react-hot-toast` - Toast notifications
+
+**MSW (Mock Service Worker):** ⭐ **MOST IMPORTANT**
+- Intercepts HTTP requests in browser
+- Returns mock responses
+- Simulates real backend APIs
+- NO actual server needed
+
+---
+
+## STEP 4: Project Structure (Microservices Pattern)
+
+Create this EXACT folder structure:
 
 ```bash
-# Still in frontend directory
-mkdir -p src/lib
+# Create all directories at once
 mkdir -p src/components/ui
 mkdir -p src/components/forms
 mkdir -p src/components/layout
 mkdir -p src/components/features
-mkdir -p src/hooks
+mkdir -p src/services
 mkdir -p src/stores
 mkdir -p src/types
 mkdir -p src/utils
+mkdir -p src/hooks
+mkdir -p src/mocks/handlers
+mkdir -p src/mocks/data
 ```
 
-### 3.2 Create API Client Configuration
+**Final Structure:**
+```
+src/
+├── app/                    # Next.js App Router pages
+├── components/
+│   ├── ui/                # Reusable UI components (Button, Input, etc.)
+│   ├── forms/             # Form components (LoginForm, IncidentForm, etc.)
+│   ├── layout/            # Layout components (Header, Sidebar, etc.)
+│   └── features/          # Feature-specific components (Dashboard, etc.)
+├── services/              # API service clients (call MSW endpoints)
+│   ├── auth.service.ts    # Auth microservice client
+│   ├── incident.service.ts # Incident microservice client
+│   └── user.service.ts    # User microservice client
+├── mocks/                 # ⭐ MSW Microservices Handlers
+│   ├── browser.ts         # MSW setup and initialization
+│   ├── handlers/          # Microservice handlers (one per domain)
+│   │   ├── auth.handlers.ts       # Auth microservice mock
+│   │   ├── incident.handlers.ts   # Incident microservice mock
+│   │   ├── user.handlers.ts       # User microservice mock
+│   │   ├── category.handlers.ts   # Category microservice mock
+│   │   ├── workflow.handlers.ts   # Workflow microservice mock
+│   │   └── audit.handlers.ts      # Audit microservice mock
+│   └── data/              # Data persistence layer (localStorage)
+│       ├── auth.store.ts          # Auth data store
+│       ├── incident.store.ts      # Incident data store
+│       ├── user.store.ts          # User data store
+│       └── category.store.ts      # Category data store
+├── stores/                # Frontend state management (Zustand)
+│   ├── authStore.ts       # Auth state
+│   ├── incidentStore.ts   # Incident state
+│   └── uiStore.ts         # UI state
+├── types/                 # TypeScript type definitions
+│   ├── auth.ts
+│   ├── incident.ts
+│   └── user.ts
+├── utils/                 # Utility functions
+│   ├── constants.ts
+│   └── formatters.ts
+└── hooks/                 # Custom React hooks
+    └── useAuth.ts
+```
 
-Create `frontend/src/lib/api-client.ts`:
-```typescript
-import axios from 'axios';
+**Why This Structure?**
 
-// API base URL - points to local backend
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+1. **`mocks/handlers/`** - Each file = one microservice
+   - `auth.handlers.ts` handles `/api/auth/*` endpoints
+   - `incident.handlers.ts` handles `/api/incidents/*` endpoints
+   - Easy to find and modify specific service logic
 
-export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+2. **`mocks/data/`** - Persistent data stores using localStorage
+   - All test data survives page refreshes
+   - Easy to reset/export test data
+   - Simulates real database
 
-// Add auth token to requests automatically
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+3. **`services/`** - Frontend calls these, which call MSW
+   - Clean separation between UI and API
+   - Easy to replace MSW with real backend later
 
-// Handle token refresh on 401 errors
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+---
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+## STEP 5: Initialize MSW (Mock Service Worker)
 
-      const refreshToken = localStorage.getItem('refresh_token');
-      if (refreshToken) {
-        try {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-            refreshToken
-          });
+### 5.1 Initialize MSW
 
-          const { accessToken } = response.data;
-          localStorage.setItem('access_token', accessToken);
-
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-          return apiClient(originalRequest);
-        } catch (refreshError) {
-          // Refresh failed, logout user
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          window.location.href = '/auth/login';
-          return Promise.reject(refreshError);
-        }
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
+```bash
+# Initialize MSW in your project
+npx msw init public/ --save
 ```
 
 **What this does:**
-- Creates axios instance pointing to local backend (localhost:3001)
-- Automatically adds auth tokens to requests
-- Refreshes tokens when they expire
-- **No cloud services** - talks directly to local backend
+- Creates `public/mockServiceWorker.js` - Service worker file
+- Adds entry to package.json
+- **IMPORTANT:** This file intercepts browser network requests
 
-### 3.3 Create Environment Configuration
-
-Create `frontend/.env.local`:
-```env
-# Backend API URL (local)
-NEXT_PUBLIC_API_URL=http://localhost:3001/api
-
-# App Configuration
-NEXT_PUBLIC_APP_NAME=Incident Management System
-NEXT_PUBLIC_APP_VERSION=1.0.0
-
-# File Upload Limits
-NEXT_PUBLIC_MAX_FILE_SIZE=10485760
+**Expected output:**
+```
+✔ Created public/mockServiceWorker.js
+✔ Updated package.json
 ```
 
-### 3.4 Update Tailwind Configuration
+### 5.2 Create Data Persistence Layer
 
-Edit `frontend/tailwind.config.js`:
+Create `src/mocks/data/storage.ts`:
+```typescript
+/**
+ * PERSISTENT DATA STORAGE using localStorage
+ *
+ * All MSW data persists across page refreshes.
+ * Each microservice has its own storage namespace.
+ */
+
+// Storage keys for each microservice
+export const STORAGE_KEYS = {
+  AUTH: {
+    USERS: 'msw_auth_users',
+    ORGANIZATIONS: 'msw_auth_organizations',
+    REFRESH_TOKENS: 'msw_auth_refresh_tokens',
+  },
+  INCIDENTS: {
+    INCIDENTS: 'msw_incidents',
+    TIMELINE: 'msw_incident_timeline',
+    ATTACHMENTS: 'msw_incident_attachments',
+  },
+  CATEGORIES: {
+    CUSTOM_CATEGORIES: 'msw_custom_categories',
+    WORKFLOWS: 'msw_workflows',
+  },
+  AUDIT: {
+    LOGS: 'msw_audit_logs',
+    NOTES: 'msw_audit_notes',
+  },
+  SLA: {
+    TRACKING: 'msw_sla_tracking',
+  }
+} as const;
+
+/**
+ * Generic storage helper
+ * Works with any data type and automatically handles JSON serialization
+ */
+export const storage = {
+  /**
+   * Get data from localStorage
+   * Returns empty array if key doesn't exist
+   */
+  get: <T>(key: string): T[] => {
+    try {
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error(`Error reading from localStorage key "${key}":`, error);
+      return [];
+    }
+  },
+
+  /**
+   * Save data to localStorage
+   * Automatically converts to JSON
+   */
+  set: <T>(key: string, data: T[]): void => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error(`Error writing to localStorage key "${key}":`, error);
+    }
+  },
+
+  /**
+   * Add single item to array in localStorage
+   */
+  add: <T extends { id: string }>(key: string, item: T): T => {
+    const all = storage.get<T>(key);
+    all.push(item);
+    storage.set(key, all);
+    return item;
+  },
+
+  /**
+   * Update item by ID
+   */
+  update: <T extends { id: string }>(key: string, id: string, updates: Partial<T>): T | null => {
+    const all = storage.get<T>(key);
+    const index = all.findIndex(item => item.id === id);
+
+    if (index === -1) return null;
+
+    all[index] = { ...all[index], ...updates };
+    storage.set(key, all);
+    return all[index];
+  },
+
+  /**
+   * Delete item by ID
+   */
+  delete: <T extends { id: string }>(key: string, id: string): boolean => {
+    const all = storage.get<T>(key);
+    const filtered = all.filter(item => item.id !== id);
+
+    if (filtered.length === all.length) return false;
+
+    storage.set(key, filtered);
+    return true;
+  },
+
+  /**
+   * Find item by ID
+   */
+  findById: <T extends { id: string }>(key: string, id: string): T | null => {
+    const all = storage.get<T>(key);
+    return all.find(item => item.id === id) || null;
+  },
+
+  /**
+   * Clear all data for a key
+   */
+  clear: (key: string): void => {
+    localStorage.removeItem(key);
+  },
+
+  /**
+   * Export all MSW data (for backup/sharing test scenarios)
+   */
+  exportAll: (): Record<string, any> => {
+    const allData: Record<string, any> = {};
+
+    Object.values(STORAGE_KEYS).forEach(serviceKeys => {
+      Object.values(serviceKeys).forEach(key => {
+        allData[key] = storage.get(key);
+      });
+    });
+
+    return allData;
+  },
+
+  /**
+   * Import MSW data (restore from backup)
+   */
+  importAll: (data: Record<string, any>): void => {
+    Object.entries(data).forEach(([key, value]) => {
+      storage.set(key, value);
+    });
+  },
+
+  /**
+   * Reset all MSW data
+   */
+  resetAll: (): void => {
+    Object.values(STORAGE_KEYS).forEach(serviceKeys => {
+      Object.values(serviceKeys).forEach(key => {
+        storage.clear(key);
+      });
+    });
+  }
+};
+
+/**
+ * Initialize storage with default data if empty
+ * Call this when MSW starts
+ */
+export const initializeStorage = () => {
+  // Only initialize if completely empty
+  if (localStorage.length === 0 || !localStorage.getItem(STORAGE_KEYS.AUTH.USERS)) {
+    console.log('🗄️  Initializing MSW storage with default data...');
+
+    // Initialize with empty arrays
+    storage.set(STORAGE_KEYS.AUTH.USERS, []);
+    storage.set(STORAGE_KEYS.AUTH.ORGANIZATIONS, []);
+    storage.set(STORAGE_KEYS.INCIDENTS.INCIDENTS, []);
+    storage.set(STORAGE_KEYS.CATEGORIES.CUSTOM_CATEGORIES, []);
+
+    console.log('✅ MSW storage initialized');
+  }
+};
+```
+
+**What this does:**
+- **All test data persists** in localStorage automatically
+- **Each microservice** has its own storage namespace
+- **Export/Import** test data for sharing scenarios
+- **Reset** all data with one command
+- **Survives page refreshes** - your test data won't disappear!
+
+### 5.3 Create MSW Browser Setup
+
+Create `src/mocks/browser.ts`:
+```typescript
+import { setupWorker } from 'msw/browser';
+import { authHandlers } from './handlers/auth.handlers';
+import { incidentHandlers } from './handlers/incident.handlers';
+import { userHandlers } from './handlers/user.handlers';
+import { categoryHandlers } from './handlers/category.handlers';
+import { workflowHandlers } from './handlers/workflow.handlers';
+import { auditHandlers } from './handlers/audit.handlers';
+import { initializeStorage } from './data/storage';
+
+/**
+ * MSW MICROSERVICES SETUP
+ *
+ * Each handler file represents one microservice:
+ * - authHandlers = Auth Service (/api/auth/*)
+ * - incidentHandlers = Incident Service (/api/incidents/*)
+ * - userHandlers = User Service (/api/users/*)
+ * - categoryHandlers = Category Service (/api/categories/*)
+ * - workflowHandlers = Workflow Service (/api/workflows/*)
+ * - auditHandlers = Audit Service (/api/audit/*)
+ */
+
+export const worker = setupWorker(
+  ...authHandlers,
+  ...incidentHandlers,
+  ...userHandlers,
+  ...categoryHandlers,
+  ...workflowHandlers,
+  ...auditHandlers
+);
+
+// Initialize persistent storage
+if (typeof window !== 'undefined') {
+  initializeStorage();
+}
+
+// Export utility functions for debugging
+export const debugMSW = {
+  exportData: () => {
+    const { storage } = require('./data/storage');
+    const data = storage.exportAll();
+    console.log('📦 MSW Data Export:', data);
+    return data;
+  },
+
+  importData: (data: Record<string, any>) => {
+    const { storage } = require('./data/storage');
+    storage.importAll(data);
+    console.log('✅ MSW Data Imported');
+  },
+
+  resetAll: () => {
+    const { storage } = require('./data/storage');
+    storage.resetAll();
+    console.log('🗑️  All MSW data cleared');
+  }
+};
+
+// Make debug functions available in browser console
+if (typeof window !== 'undefined') {
+  (window as any).mswDebug = debugMSW;
+}
+```
+
+**What this does:**
+- **Combines all microservice handlers** into one worker
+- **Initializes persistent storage** automatically
+- **Exposes debug tools** in browser console:
+  - `window.mswDebug.exportData()` - Export all test data
+  - `window.mswDebug.importData(data)` - Import test data
+  - `window.mswDebug.resetAll()` - Clear all data
+
+---
+
+## STEP 6: Configure Tailwind CSS
+
+Update `tailwind.config.js` with incident management color scheme:
+
 ```javascript
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -497,15 +497,15 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Primary blues
         primary: {
           50: '#f0f9ff',
           100: '#e0f2fe',
           500: '#3b82f6',
           600: '#2563eb',
           700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
         },
+        // Danger/Critical
         danger: {
           50: '#fef2f2',
           100: '#fee2e2',
@@ -513,6 +513,7 @@ module.exports = {
           600: '#dc2626',
           700: '#b91c1c',
         },
+        // Warning/High
         warning: {
           50: '#fffbeb',
           100: '#fef3c7',
@@ -520,6 +521,7 @@ module.exports = {
           600: '#d97706',
           700: '#b45309',
         },
+        // Success/Low
         success: {
           50: '#f0fdf4',
           100: '#dcfce7',
@@ -536,190 +538,128 @@ module.exports = {
 
 ---
 
-## STEP 4: Root Package.json (Single Command Startup)
+## STEP 7: Initialize MSW in App
 
-Go back to project root and create `package.json`:
+Update `src/app/layout.tsx` to start MSW:
 
-```bash
-cd ..
-```
+```typescript
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
 
-Create `incident-management/package.json`:
-```json
-{
-  "name": "incident-management",
-  "version": "1.0.0",
-  "description": "Local-only incident management system",
-  "scripts": {
-    "setup": "npm run setup:backend && npm run setup:frontend && npm run db:init",
-    "setup:backend": "cd backend && npm install",
-    "setup:frontend": "cd frontend && npm install",
-    "db:init": "cd backend && npm run db:init",
-    "db:reset": "cd backend && npm run db:reset",
-    "dev": "npm-run-all --parallel dev:backend dev:frontend",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "build": "npm run build:backend && npm run build:frontend",
-    "build:backend": "cd backend && npm run build",
-    "build:frontend": "cd frontend && npm run build",
-    "start": "npm-run-all --parallel start:backend start:frontend",
-    "start:backend": "cd backend && npm start",
-    "start:frontend": "cd frontend && npm start"
-  },
-  "devDependencies": {
-    "npm-run-all": "^4.1.5"
-  }
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'Incident Management System',
+  description: 'Professional incident management and reporting system',
 }
-```
 
-Install root dependencies:
-```bash
-npm install
+// Initialize MSW in browser
+if (typeof window !== 'undefined') {
+  const initMSW = async () => {
+    const { worker } = await import('@/mocks/browser');
+    await worker.start({
+      onUnhandledRequest: 'bypass',
+      quiet: false, // Set to true to hide MSW logs
+    });
+    console.log('🚀 MSW Microservices started');
+    console.log('💾 All API calls will be mocked and data persisted to localStorage');
+    console.log('🔧 Debug tools: window.mswDebug');
+  };
+  initMSW();
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        <div id="root">
+          {children}
+        </div>
+      </body>
+    </html>
+  )
+}
 ```
 
 **What this does:**
-- **npm run setup:** Installs all dependencies and creates database (run this ONCE)
-- **npm run dev:** Starts both backend and frontend with ONE command
-- **npm run db:reset:** Deletes and recreates database (useful during development)
+- **Starts MSW** automatically when app loads
+- **Logs to console** so you know it's working
+- **Intercepts all API calls** to `/api/*`
+- **All data persists** in localStorage
 
 ---
 
-## STEP 5: Create Setup Verification Script
+## STEP 8: Basic Utility Setup
 
-Create `check-setup.js` in project root:
-```javascript
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+Create `src/utils/constants.ts`:
+```typescript
+export const APP_CONFIG = {
+  APP_NAME: 'Incident Management System',
+  VERSION: '1.0.0',
+  API_BASE_URL: '/api', // MSW intercepts this
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+  ALLOWED_FILE_TYPES: [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'application/pdf',
+  ]
+} as const;
 
-console.log('🔍 Checking system requirements...\n');
+export const ROUTES = {
+  HOME: '/',
+  LOGIN: '/auth/login',
+  REGISTER: '/auth/register',
+  DASHBOARD: '/dashboard',
+  REPORT_ANONYMOUS: '/report/anonymous',
+  REPORT_GUEST: '/report/guest',
+  REPORT_USER: '/report/user',
+  TRACK: '/track'
+} as const;
 
-// Check Node.js version
-try {
-  const nodeVersion = execSync('node --version', { encoding: 'utf-8' }).trim();
-  const majorVersion = parseInt(nodeVersion.match(/v(\d+)/)[1]);
-
-  if (majorVersion >= 18) {
-    console.log(`✅ Node.js ${nodeVersion} (required: v18+)`);
-  } else {
-    console.log(`❌ Node.js ${nodeVersion} - Please upgrade to v18 or higher`);
-    process.exit(1);
+// Microservice API endpoints
+export const API_ENDPOINTS = {
+  AUTH: {
+    LOGIN: '/api/auth/login',
+    REGISTER: '/api/auth/register',
+    LOGOUT: '/api/auth/logout',
+    REFRESH: '/api/auth/refresh',
+    ME: '/api/auth/me',
+  },
+  INCIDENTS: {
+    LIST: '/api/incidents',
+    CREATE: '/api/incidents',
+    GET: (id: string) => `/api/incidents/${id}`,
+    UPDATE: (id: string) => `/api/incidents/${id}`,
+    DELETE: (id: string) => `/api/incidents/${id}`,
+    TRACK: (trackingId: string) => `/api/incidents/track/${trackingId}`,
+  },
+  USERS: {
+    LIST: '/api/users',
+    CREATE: '/api/users',
+    GET: (id: string) => `/api/users/${id}`,
+    UPDATE: (id: string) => `/api/users/${id}`,
+  },
+  CATEGORIES: {
+    LIST: '/api/categories',
+    CREATE: '/api/categories',
+    GET: (id: string) => `/api/categories/${id}`,
+  },
+  WORKFLOWS: {
+    LIST: '/api/workflows',
+    CREATE: '/api/workflows',
+  },
+  AUDIT: {
+    LOGS: '/api/audit/logs',
+    NOTES: '/api/audit/notes',
   }
-} catch (error) {
-  console.log('❌ Node.js not installed');
-  process.exit(1);
-}
-
-// Check npm
-try {
-  const npmVersion = execSync('npm --version', { encoding: 'utf-8' }).trim();
-  console.log(`✅ npm ${npmVersion}`);
-} catch (error) {
-  console.log('❌ npm not installed');
-  process.exit(1);
-}
-
-// Check git
-try {
-  const gitVersion = execSync('git --version', { encoding: 'utf-8' }).trim();
-  console.log(`✅ ${gitVersion}`);
-} catch (error) {
-  console.log('⚠️  Git not installed (optional but recommended)');
-}
-
-// Check project structure
-console.log('\n🗂️  Checking project structure...\n');
-
-const requiredDirs = ['backend', 'frontend'];
-const requiredFiles = [
-  'backend/package.json',
-  'frontend/package.json',
-  'backend/.env',
-];
-
-requiredDirs.forEach(dir => {
-  if (fs.existsSync(dir)) {
-    console.log(`✅ ${dir}/ directory exists`);
-  } else {
-    console.log(`❌ ${dir}/ directory missing`);
-  }
-});
-
-requiredFiles.forEach(file => {
-  if (fs.existsSync(file)) {
-    console.log(`✅ ${file} exists`);
-  } else {
-    console.log(`⚠️  ${file} missing`);
-  }
-});
-
-console.log('\n🎉 Setup check complete!\n');
-console.log('To start development:');
-console.log('  npm run dev\n');
+} as const;
 ```
-
-Run the check:
-```bash
-node check-setup.js
-```
-
----
-
-## STEP 6: First Time Setup Instructions
-
-### For a Junior Developer - Follow These Steps EXACTLY:
-
-1. **Install Prerequisites:**
-   ```bash
-   # Check if Node.js is installed
-   node --version
-   # Should show v18 or higher
-
-   # If not installed, download from: https://nodejs.org/
-   ```
-
-2. **Clone or Create Project:**
-   ```bash
-   # If starting fresh, create directory
-   mkdir incident-management
-   cd incident-management
-   ```
-
-3. **Run Setup (ONE TIME ONLY):**
-   ```bash
-   # Install all dependencies and create database
-   npm run setup
-   ```
-
-   **This will:**
-   - Install backend dependencies
-   - Install frontend dependencies
-   - Create SQLite database
-   - Set up all tables
-
-4. **Copy Environment Files:**
-   ```bash
-   cd backend
-   cp .env.example .env
-   # Edit .env and change JWT_SECRET to a random string
-   cd ..
-   ```
-
-5. **Start Development:**
-   ```bash
-   # From project root
-   npm run dev
-   ```
-
-   **You should see:**
-   ```
-   Backend running on http://localhost:3001
-   Frontend running on http://localhost:3000
-   ```
-
-6. **Open Browser:**
-   - Go to: http://localhost:3000
-   - Backend API: http://localhost:3001/api
 
 ---
 
@@ -727,42 +667,34 @@ node check-setup.js
 
 ### ❌ Common Mistakes:
 
-1. **"Module not found" errors:**
-   - **Fix:** Run `npm run setup` from project root
+1. **"MSW not intercepting requests"**
+   - **Fix:** Make sure `npx msw init public/` was run
+   - Check browser console for "🚀 MSW Microservices started"
+   - Clear browser cache and reload
+
+2. **"Module not found" errors**
+   - **Fix:** Run `npm install` from project root
    - Make sure you're in the right directory
 
-2. **"Port already in use":**
-   - **Fix:** Kill the process:
-     ```bash
-     # On Mac/Linux
-     lsof -ti:3000 | xargs kill -9
-     lsof -ti:3001 | xargs kill -9
+3. **"Data disappeared after refresh"**
+   - **Fix:** Check if localStorage is working:
+     ```javascript
+     // In browser console
+     window.mswDebug.exportData()
+     ```
+   - Private/Incognito mode may block localStorage
 
-     # On Windows
-     netstat -ano | findstr :3000
-     taskkill /PID <PID> /F
+4. **"Can't find handlers files"**
+   - **Fix:** They'll be created in PROMPT 2, 3, 4
+   - For now, create empty placeholder files:
+     ```bash
+     touch src/mocks/handlers/auth.handlers.ts
+     echo "export const authHandlers = [];" > src/mocks/handlers/auth.handlers.ts
      ```
 
-3. **Database locked error:**
-   - **Fix:** Close all database connections and restart
-   - If persists: `npm run db:reset`
-
-4. **CORS errors in browser:**
-   - **Fix:** Make sure backend .env has `CORS_ORIGIN=http://localhost:3000`
-   - Restart backend after changing .env
-
-5. **TypeScript errors:**
-   - **Fix:** Run `npm install` in both backend and frontend
+5. **TypeScript errors about MSW**
+   - **Fix:** Make sure `msw` is installed as devDependency
    - Restart your editor/IDE
-
-### ✅ Success Indicators:
-
-You'll know setup worked when:
-1. `npm run dev` starts without errors
-2. Browser opens to http://localhost:3000
-3. You see the landing page (even if it says "404" for some links - that's OK, we'll build those next)
-4. Network tab shows API calls to localhost:3001
-5. `database.sqlite` file exists in backend directory
 
 ---
 
@@ -770,69 +702,95 @@ You'll know setup worked when:
 
 After completing this prompt, you should have:
 
-✅ Complete project structure (backend + frontend)
-✅ Local SQLite database (no cloud, no configuration)
-✅ Backend API running on localhost:3001
-✅ Frontend app running on localhost:3000
-✅ Single command startup (`npm run dev`)
-✅ Zero external dependencies or paid services
-✅ All code running on your local machine
-✅ Database tables created and ready
-✅ File upload directory created
-✅ TypeScript configured for both frontend and backend
-✅ Environment variables configured
+✅ Next.js 14+ project with TypeScript
+✅ All dependencies installed (including MSW)
+✅ Microservices folder structure created
+✅ MSW initialized with service worker
+✅ Persistent data storage layer (localStorage)
+✅ Tailwind CSS configured
+✅ MSW starting automatically in browser
+✅ Debug tools available in console
+
+**Run the development server:**
+```bash
+npm run dev
+```
+
+**Open browser to:** http://localhost:3000
+
+**Check browser console - you should see:**
+```
+🚀 MSW Microservices started
+💾 All API calls will be mocked and data persisted to localStorage
+🔧 Debug tools: window.mswDebug
+```
 
 ---
 
 ## VERIFICATION CHECKLIST
 
-Run these commands to verify everything works:
-
 ```bash
-# 1. Check project structure
-ls -la
-# Should see: backend/ frontend/ package.json
-
-# 2. Check database exists
-ls backend/database.sqlite
-# Should show the database file
-
-# 3. Start development
+# 1. Start development server
 npm run dev
-# Should start both servers
+# Should start without errors
 
-# 4. Test backend API
-curl http://localhost:3001/api/health
-# Should return: {"status":"ok"}
+# 2. Open browser console
+# Type: window.mswDebug.exportData()
+# Should see: { msw_auth_users: [], msw_incidents: [], ... }
 
-# 5. Open frontend
-# Go to http://localhost:3000 in browser
+# 3. Check MSW service worker
+# Open: http://localhost:3000
+# DevTools → Application → Service Workers
+# Should see: mockServiceWorker.js (activated)
 ```
 
 ---
 
-## TROUBLESHOOTING
+## MICROSERVICES ARCHITECTURE SUMMARY
 
-**Q: "npm: command not found"**
-A: Install Node.js from https://nodejs.org/ - it includes npm
+Your app now has this architecture:
 
-**Q: "Permission denied" errors**
-A: Don't use `sudo`. If on Mac/Linux, fix permissions:
-```bash
-sudo chown -R $USER ~/.npm
+```
+┌─────────────────────────────────────────┐
+│         BROWSER (localhost:3000)        │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌──────────────────────────────────┐  │
+│  │      Next.js Frontend            │  │
+│  │  (React Components & Pages)      │  │
+│  └──────────────┬───────────────────┘  │
+│                 │                       │
+│                 │ API Calls             │
+│                 ▼                       │
+│  ┌──────────────────────────────────┐  │
+│  │  MSW (Mock Service Worker)       │  │
+│  │  Intercepts /api/* requests      │  │
+│  └──────────────┬───────────────────┘  │
+│                 │                       │
+│        ┌────────┴────────┐             │
+│        │                 │             │
+│   ┌────▼─────┐    ┌─────▼──────┐      │
+│   │ Auth     │    │ Incident   │      │
+│   │ Handler  │    │ Handler    │ ...  │
+│   └────┬─────┘    └─────┬──────┘      │
+│        │                │             │
+│        └────────┬────────┘             │
+│                 ▼                       │
+│  ┌──────────────────────────────────┐  │
+│  │  localStorage (Data Persistence) │  │
+│  │  - msw_auth_users                │  │
+│  │  - msw_incidents                 │  │
+│  │  - msw_categories ...            │  │
+│  └──────────────────────────────────┘  │
+└─────────────────────────────────────────┘
 ```
 
-**Q: "Database is locked"**
-A: Stop all servers (`Ctrl+C`) and restart with `npm run dev`
-
-**Q: Can I use this without internet?**
-A: After initial setup (which downloads packages), YES - everything runs offline
-
-**Q: Where is my data stored?**
-A:
-- Database: `backend/database.sqlite`
-- Files: `backend/uploads/`
-- To backup: Copy these files
+**Key Points:**
+- ✅ NO backend server needed
+- ✅ MSW intercepts API calls
+- ✅ Each handler = one microservice
+- ✅ Data persists in localStorage
+- ✅ Perfect for rapid prototyping
 
 ---
 

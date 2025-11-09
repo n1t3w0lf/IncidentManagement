@@ -10,9 +10,19 @@ import Link from 'next/link';
 import { useIncidentStore } from '@/stores/incidentStore';
 import { useAuthStore } from '@/stores/authStore';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Textarea, Alert } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Textarea, Alert, ConfirmDialog } from '@/components/ui';
+import { showToast } from '@/components/ui/Toast';
 import { STATUS_CONFIG, SEVERITY_CONFIG, ESCALATION_CONFIG } from '@/lib/constants';
 import { formatDateTime, formatRelativeTime } from '@/lib/utils';
+
+type ConfirmDialogState = {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  confirmVariant: 'primary' | 'danger' | 'success';
+  action: (() => void) | null;
+};
 
 export default function IncidentDetailPage() {
   const params = useParams();
@@ -22,6 +32,15 @@ export default function IncidentDetailPage() {
   const [comment, setComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [showSuccess, setShowSuccess] = useState(searchParams.get('success') === 'true');
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: '',
+    confirmVariant: 'primary',
+    action: null,
+  });
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -43,8 +62,10 @@ export default function IncidentDetailPage() {
     try {
       await addComment(currentIncident.id, comment);
       setComment('');
+      showToast.success('Comment added successfully');
     } catch (error) {
       console.error('Failed to add comment:', error);
+      showToast.error('Failed to add comment. Please try again.');
     } finally {
       setIsSubmittingComment(false);
     }
@@ -53,11 +74,28 @@ export default function IncidentDetailPage() {
   const handleStatusChange = async (newStatus: string) => {
     if (!currentIncident) return;
 
+    setIsUpdatingStatus(true);
     try {
       await updateIncident(currentIncident.id, { status: newStatus as any });
+      showToast.success(`Status updated to ${STATUS_CONFIG[newStatus as keyof typeof STATUS_CONFIG].label}`);
+      setConfirmDialog({ ...confirmDialog, isOpen: false });
     } catch (error) {
       console.error('Failed to update status:', error);
+      showToast.error('Failed to update status. Please try again.');
+    } finally {
+      setIsUpdatingStatus(false);
     }
+  };
+
+  const confirmStatusChange = (newStatus: string, dialogTitle: string, dialogMessage: string, variant: 'primary' | 'danger' | 'success' = 'primary') => {
+    setConfirmDialog({
+      isOpen: true,
+      title: dialogTitle,
+      message: dialogMessage,
+      confirmText: 'Confirm',
+      confirmVariant: variant,
+      action: () => handleStatusChange(newStatus),
+    });
   };
 
   if (isLoading || !currentIncident) {
@@ -347,7 +385,12 @@ export default function IncidentDetailPage() {
                       <Button
                         variant="primary"
                         className="w-full"
-                        onClick={() => handleStatusChange('under_review')}
+                        onClick={() => confirmStatusChange(
+                          'under_review',
+                          'Start Review?',
+                          'Are you sure you want to start reviewing this incident?',
+                          'primary'
+                        )}
                       >
                         Start Review
                       </Button>
@@ -356,7 +399,12 @@ export default function IncidentDetailPage() {
                       <Button
                         variant="primary"
                         className="w-full"
-                        onClick={() => handleStatusChange('investigating')}
+                        onClick={() => confirmStatusChange(
+                          'investigating',
+                          'Begin Investigation?',
+                          'Are you sure you want to begin investigating this incident?',
+                          'primary'
+                        )}
                       >
                         Begin Investigation
                       </Button>
@@ -365,7 +413,12 @@ export default function IncidentDetailPage() {
                       <Button
                         variant="success"
                         className="w-full"
-                        onClick={() => handleStatusChange('resolved')}
+                        onClick={() => confirmStatusChange(
+                          'resolved',
+                          'Mark as Resolved?',
+                          'Are you sure this incident has been resolved? You can still reopen it later if needed.',
+                          'success'
+                        )}
                       >
                         Mark as Resolved
                       </Button>
@@ -374,7 +427,12 @@ export default function IncidentDetailPage() {
                       <Button
                         variant="success"
                         className="w-full"
-                        onClick={() => handleStatusChange('closed')}
+                        onClick={() => confirmStatusChange(
+                          'closed',
+                          'Close Incident?',
+                          'Are you sure you want to close this incident? This action will mark the incident as complete.',
+                          'success'
+                        )}
                       >
                         Close Incident
                       </Button>
@@ -383,7 +441,12 @@ export default function IncidentDetailPage() {
                       <Button
                         variant="danger"
                         className="w-full"
-                        onClick={() => handleStatusChange('rejected')}
+                        onClick={() => confirmStatusChange(
+                          'rejected',
+                          'Reject Incident?',
+                          'Are you sure you want to reject this incident? This action cannot be undone easily.',
+                          'danger'
+                        )}
                       >
                         Reject
                       </Button>
@@ -412,6 +475,18 @@ export default function IncidentDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+          onConfirm={() => confirmDialog.action?.()}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmText={confirmDialog.confirmText}
+          confirmVariant={confirmDialog.confirmVariant}
+          isLoading={isUpdatingStatus}
+        />
       </div>
     </DashboardLayout>
   );

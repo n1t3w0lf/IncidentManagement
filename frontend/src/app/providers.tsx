@@ -5,6 +5,8 @@
 // ============================================
 
 import { useEffect, useState } from 'react';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ToastContainer } from '@/components/ui/Toast';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mswReady, setMswReady] = useState(false);
@@ -37,5 +39,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <ErrorBoundary>
+      {children}
+      <ToastContainer />
+    </ErrorBoundary>
+  );
 }

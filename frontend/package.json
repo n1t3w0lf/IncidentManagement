@@ -41,5 +41,10 @@
     "postcss": "^8.4.33",
     "autoprefixer": "^10.4.17",
     "msw": "^2.1.5"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }

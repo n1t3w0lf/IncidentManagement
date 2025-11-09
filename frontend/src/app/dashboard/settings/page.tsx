@@ -200,7 +200,7 @@ export default function SettingsPage() {
                 <dl className="grid gap-2 sm:grid-cols-2 text-sm">
                   <div>
                     <dt className="text-gray-500">Name</dt>
-                    <dd className="font-medium text-gray-900">{user?.name}</dd>
+                    <dd className="font-medium text-gray-900">{user?.firstName} {user?.lastName}</dd>
                   </div>
                   <div>
                     <dt className="text-gray-500">Email</dt>

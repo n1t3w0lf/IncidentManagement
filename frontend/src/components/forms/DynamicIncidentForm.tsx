@@ -4,7 +4,7 @@
 // DYNAMIC INCIDENT FORM
 // ============================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Input, Textarea, Select, Button, Alert } from '@/components/ui';
 import { ALL_INCIDENT_CATEGORIES } from '@/lib/categories';
 import { INDUSTRY_TYPES } from '@/lib/constants';
@@ -34,6 +34,8 @@ export function DynamicIncidentForm({
     reporterInfo: {},
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const formRefs = useRef<Record<string, HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>>({});
 
   // Get categories for selected industry
   const availableCategories = selectedIndustry
@@ -117,6 +119,110 @@ export function DynamicIncidentForm({
     }));
   };
 
+  // Validate individual field on blur
+  const validateField = (fieldName: string, value?: any): string | undefined => {
+    const fieldValue = value !== undefined ? value : formData[fieldName];
+
+    switch (fieldName) {
+      case 'title':
+        if (!fieldValue || !fieldValue.trim()) {
+          return 'Title is required';
+        }
+        break;
+
+      case 'description':
+        if (!fieldValue || !fieldValue.trim()) {
+          return 'Description is required';
+        }
+        break;
+
+      case 'severity':
+        if (!fieldValue) {
+          return 'Severity is required';
+        }
+        break;
+
+      case 'category':
+        if (!selectedCategory) {
+          return 'Category is required';
+        }
+        break;
+
+      case 'reporterInfo.name':
+        if (showReporterInfo && reporterType === 'guest' && !formData.reporterInfo.name) {
+          return 'Name is required';
+        }
+        break;
+
+      case 'reporterInfo.email':
+        if (showReporterInfo && reporterType === 'guest') {
+          if (!formData.reporterInfo.email) {
+            return 'Email is required';
+          } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.reporterInfo.email)) {
+            return 'Invalid email format';
+          }
+        }
+        break;
+
+      default:
+        // Handle custom fields
+        if (fieldName.startsWith('customFields.')) {
+          const fieldId = fieldName.replace('customFields.', '');
+          const customField = selectedCategory?.customFields?.find((f) => f.id === fieldId);
+
+          if (customField) {
+            const customValue = formData.customFields[fieldId];
+
+            if (customField.required && !customValue) {
+              return `${customField.name} is required`;
+            }
+
+            if (customValue) {
+              if (customField.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customValue)) {
+                return 'Invalid email format';
+              }
+
+              if (customField.type === 'phone' && !/^\+?[\d\s\-()]+$/.test(customValue)) {
+                return 'Invalid phone number';
+              }
+
+              if (customField.type === 'number') {
+                const num = Number(customValue);
+                if (isNaN(num)) {
+                  return 'Must be a number';
+                } else if (customField.validation?.min !== undefined && num < customField.validation.min) {
+                  return `Must be at least ${customField.validation.min}`;
+                } else if (customField.validation?.max !== undefined && num > customField.validation.max) {
+                  return `Must be at most ${customField.validation.max}`;
+                }
+              }
+            }
+          }
+        }
+        break;
+    }
+
+    return undefined;
+  };
+
+  const handleBlur = (fieldName: string) => {
+    // Mark field as touched
+    setTouchedFields((prev) => new Set(prev).add(fieldName));
+
+    // Validate the field
+    const error = validateField(fieldName);
+
+    if (error) {
+      setErrors((prev) => ({ ...prev, [fieldName]: error }));
+    } else {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
+  };
+
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -187,6 +293,13 @@ export function DynamicIncidentForm({
     e.preventDefault();
 
     if (!validate()) {
+      // Focus management: scroll to and focus the first error field
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField && formRefs.current[firstErrorField]) {
+        const element = formRefs.current[firstErrorField];
+        element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element?.focus();
+      }
       return;
     }
 
@@ -212,6 +325,7 @@ export function DynamicIncidentForm({
   const renderCustomField = (field: CustomField) => {
     const value = formData.customFields[field.id] || '';
     const error = errors[`customFields.${field.id}`];
+    const fieldKey = `customFields.${field.id}`;
 
     switch (field.type) {
       case 'text':
@@ -220,10 +334,12 @@ export function DynamicIncidentForm({
         return (
           <Input
             key={field.id}
+            ref={(el) => (formRefs.current[fieldKey] = el)}
             label={field.name}
             type={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : 'text'}
             value={value}
             onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
+            onBlur={() => handleBlur(fieldKey)}
             error={error}
             placeholder={field.placeholder}
             required={field.required}
@@ -235,9 +351,11 @@ export function DynamicIncidentForm({
         return (
           <Textarea
             key={field.id}
+            ref={(el) => (formRefs.current[fieldKey] = el)}
             label={field.name}
             value={value}
             onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
+            onBlur={() => handleBlur(fieldKey)}
             error={error}
             placeholder={field.placeholder}
             required={field.required}
@@ -249,10 +367,12 @@ export function DynamicIncidentForm({
         return (
           <Input
             key={field.id}
+            ref={(el) => (formRefs.current[fieldKey] = el)}
             label={field.name}
             type="number"
             value={value}
             onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
+            onBlur={() => handleBlur(fieldKey)}
             error={error}
             placeholder={field.placeholder}
             required={field.required}
@@ -264,10 +384,12 @@ export function DynamicIncidentForm({
         return (
           <Input
             key={field.id}
+            ref={(el) => (formRefs.current[fieldKey] = el)}
             label={field.name}
             type="date"
             value={value}
             onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
+            onBlur={() => handleBlur(fieldKey)}
             error={error}
             required={field.required}
             helperText={field.helpText}
@@ -278,9 +400,11 @@ export function DynamicIncidentForm({
         return (
           <Select
             key={field.id}
+            ref={(el) => (formRefs.current[fieldKey] = el)}
             label={field.name}
             value={value}
             onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
+            onBlur={() => handleBlur(fieldKey)}
             error={error}
             options={(field.options || []).map((opt) => ({ value: opt, label: opt }))}
             required={field.required}
@@ -351,19 +475,23 @@ export function DynamicIncidentForm({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
+              ref={(el) => (formRefs.current['reporterInfo.name'] = el)}
               label="Full Name"
               value={formData.reporterInfo.name || ''}
               onChange={(e) => handleReporterInfoChange('name', e.target.value)}
+              onBlur={() => handleBlur('reporterInfo.name')}
               error={errors['reporterInfo.name']}
               placeholder="John Doe"
               required
             />
 
             <Input
+              ref={(el) => (formRefs.current['reporterInfo.email'] = el)}
               label="Email"
               type="email"
               value={formData.reporterInfo.email || ''}
               onChange={(e) => handleReporterInfoChange('email', e.target.value)}
+              onBlur={() => handleBlur('reporterInfo.email')}
               error={errors['reporterInfo.email']}
               placeholder="john.doe@example.com"
               required
@@ -394,18 +522,22 @@ export function DynamicIncidentForm({
             <h3 className="text-lg font-semibold text-gray-900">Incident Details</h3>
 
             <Input
+              ref={(el) => (formRefs.current['title'] = el)}
               label="Incident Title"
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
+              onBlur={() => handleBlur('title')}
               error={errors.title}
               placeholder="Brief summary of the incident"
               required
             />
 
             <Textarea
+              ref={(el) => (formRefs.current['description'] = el)}
               label="Description"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
+              onBlur={() => handleBlur('description')}
               error={errors.description}
               placeholder="Provide detailed information about what happened..."
               rows={6}
@@ -414,9 +546,11 @@ export function DynamicIncidentForm({
             />
 
             <Select
+              ref={(el) => (formRefs.current['severity'] = el)}
               label="Severity"
               value={formData.severity}
               onChange={(e) => handleChange('severity', e.target.value)}
+              onBlur={() => handleBlur('severity')}
               options={[
                 { value: 'low', label: 'Low - Minor issue with minimal impact' },
                 { value: 'medium', label: 'Medium - Moderate issue requiring attention' },

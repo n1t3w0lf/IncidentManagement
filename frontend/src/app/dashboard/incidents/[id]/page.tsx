@@ -14,6 +14,8 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Textarea, Aler
 import { showToast } from '@/components/ui/Toast';
 import { STATUS_CONFIG, SEVERITY_CONFIG, ESCALATION_CONFIG } from '@/lib/constants';
 import { formatDateTime, formatRelativeTime } from '@/lib/utils';
+import { validateStatusChange } from '@/lib/statusTransitions';
+import type { IncidentStatus } from '@/types/incident';
 
 type ConfirmDialogState = {
   isOpen: boolean;
@@ -88,6 +90,22 @@ export default function IncidentDetailPage() {
   };
 
   const confirmStatusChange = (newStatus: string, dialogTitle: string, dialogMessage: string, variant: 'primary' | 'danger' | 'success' = 'primary') => {
+    if (!currentIncident || !user) return;
+
+    // Validate the status transition
+    const validation = validateStatusChange(
+      currentIncident.status,
+      newStatus as IncidentStatus,
+      user.role,
+      currentIncident.escalationLevel,
+      currentIncident.category.requiresApproval
+    );
+
+    if (!validation.allowed) {
+      showToast.error(validation.reason || 'Invalid status transition');
+      return;
+    }
+
     setConfirmDialog({
       isOpen: true,
       title: dialogTitle,

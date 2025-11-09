@@ -100,6 +100,39 @@ const paginateResults = <T>(data: T[], params: PaginationParams): { data: T[]; t
 // ============================================
 
 export const incidentHandlers = [
+  // GET /incidents/track/:trackingId - Public endpoint for tracking incidents (no auth required)
+  http.get(`${API_URL}/incidents/track/:trackingId`, async ({ params, request }) => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const { trackingId } = params;
+    const url = new URL(request.url);
+    const email = url.searchParams.get('email');
+
+    // Find incident by tracking ID
+    const incident = mockIncidents.find(i => i.trackingId === trackingId);
+
+    if (!incident) {
+      return HttpResponse.json(
+        { success: false, error: 'Incident not found. Please check your tracking ID and try again.' },
+        { status: 404 }
+      );
+    }
+
+    // If email is provided, verify it matches (optional security check for guest reports)
+    if (email && incident.reporterInfo.email && incident.reporterInfo.email !== email) {
+      return HttpResponse.json(
+        { success: false, error: 'Email does not match our records for this incident.' },
+        { status: 403 }
+      );
+    }
+
+    // Return incident data (excluding sensitive internal information)
+    return HttpResponse.json({
+      success: true,
+      data: incident,
+    });
+  }),
+
   // GET /incidents - List incidents with filtering and pagination
   http.get(`${API_URL}/incidents`, async ({ request }) => {
     await new Promise(resolve => setTimeout(resolve, 600));

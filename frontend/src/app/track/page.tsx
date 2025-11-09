@@ -30,26 +30,17 @@ export default function TrackPage() {
         throw new Error('Invalid tracking ID format. Expected format: INC-123456-ABCD');
       }
 
-      // In real app, this would query the backend
-      // For demo, we'll simulate a response
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Mock: Check if we have this incident in our mock data
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/incidents`);
+      // Call the public tracking endpoint (no authentication required)
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+      const emailParam = email ? `?email=${encodeURIComponent(email)}` : '';
+      const response = await fetch(`${API_URL}/incidents/track/${trackingId}${emailParam}`);
       const data = await response.json();
 
-      const foundIncident = data.data?.data?.find((inc: Incident) => inc.trackingId === trackingId);
-
-      if (!foundIncident) {
-        throw new Error('Incident not found. Please check your tracking ID and try again.');
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Incident not found. Please check your tracking ID and try again.');
       }
 
-      // If email was provided, verify it matches
-      if (email && foundIncident.reporterInfo.email !== email) {
-        throw new Error('Email does not match our records for this incident.');
-      }
-
-      setIncident(foundIncident);
+      setIncident(data.data);
     } catch (err: any) {
       setError(err.message);
     } finally {

@@ -28,6 +28,21 @@ export function DashboardHeader() {
     }
   }, [user, fetchUnreadCount]);
 
+  // Keyboard navigation - close menus on Escape
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowNotifications(false);
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showNotifications || showUserMenu) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [showNotifications, showUserMenu]);
+
   const handleLogout = async () => {
     await logout();
     router.push('/');
@@ -54,13 +69,17 @@ export function DashboardHeader() {
           <div className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className="relative rounded-full p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="relative rounded-full p-3 text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="View notifications"
+              aria-expanded={showNotifications}
+              aria-haspopup="true"
             >
               <svg
                 className="h-6 w-6"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -70,7 +89,10 @@ export function DashboardHeader() {
                 />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-danger-600 text-xs font-medium text-white">
+                <span
+                  className="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-danger-600 text-xs font-medium text-white"
+                  aria-label={`${unreadCount} unread notifications`}
+                >
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
@@ -82,8 +104,13 @@ export function DashboardHeader() {
                 <div
                   className="fixed inset-0 z-10"
                   onClick={() => setShowNotifications(false)}
+                  aria-hidden="true"
                 />
-                <div className="absolute right-0 mt-2 w-80 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-20">
+                <div
+                  className="absolute right-0 mt-2 w-80 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-20"
+                  role="menu"
+                  aria-label="Notifications menu"
+                >
                   <div className="p-4 border-b">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
@@ -97,6 +124,7 @@ export function DashboardHeader() {
                       href="/dashboard/notifications"
                       className="block p-4 text-center text-sm text-primary-600 hover:bg-gray-50"
                       onClick={() => setShowNotifications(false)}
+                      role="menuitem"
                     >
                       View all notifications →
                     </Link>
@@ -110,9 +138,12 @@ export function DashboardHeader() {
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center space-x-3 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex items-center space-x-3 rounded-full p-2 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 min-h-[44px]"
+              aria-label="User menu"
+              aria-expanded={showUserMenu}
+              aria-haspopup="true"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-600 text-white text-sm font-medium">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-600 text-white text-sm font-medium">
                 {user && getInitials(`${user.firstName} ${user.lastName}`)}
               </div>
               <div className="hidden md:block text-left">
@@ -126,6 +157,7 @@ export function DashboardHeader() {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -142,8 +174,13 @@ export function DashboardHeader() {
                 <div
                   className="fixed inset-0 z-10"
                   onClick={() => setShowUserMenu(false)}
+                  aria-hidden="true"
                 />
-                <div className="absolute right-0 mt-2 w-56 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-20">
+                <div
+                  className="absolute right-0 mt-2 w-56 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-20"
+                  role="menu"
+                  aria-label="User menu"
+                >
                   <div className="p-3 border-b">
                     <p className="text-sm font-medium text-gray-900">
                       {user?.firstName} {user?.lastName}
@@ -155,6 +192,7 @@ export function DashboardHeader() {
                       href="/dashboard/profile"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => setShowUserMenu(false)}
+                      role="menuitem"
                     >
                       Your Profile
                     </Link>
@@ -162,6 +200,7 @@ export function DashboardHeader() {
                       href="/dashboard/settings"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => setShowUserMenu(false)}
+                      role="menuitem"
                     >
                       Settings
                     </Link>
@@ -170,6 +209,7 @@ export function DashboardHeader() {
                     <button
                       onClick={handleLogout}
                       className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                      role="menuitem"
                     >
                       Sign out
                     </button>

@@ -150,7 +150,7 @@ export default function IncidentDetailPage() {
               variant={
                 currentIncident.severity === 'critical' ? 'danger' :
                 currentIncident.severity === 'high' ? 'warning' :
-                currentIncident.severity === 'medium' ? 'info' : 'default'
+                currentIncident.severity === 'medium' ? 'info' : 'success'
               }
               size="lg"
             >

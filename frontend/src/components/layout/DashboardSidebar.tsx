@@ -4,7 +4,7 @@
 // DASHBOARD SIDEBAR
 // ============================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
@@ -22,6 +22,20 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const { user } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Keyboard navigation - close mobile menu on Escape
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isMobileMenuOpen) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    if (isMobileMenuOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isMobileMenuOpen]);
 
   const navigation: NavItem[] = [
     {
@@ -111,9 +125,12 @@ export function DashboardSidebar() {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="fixed bottom-4 right-4 z-50 lg:hidden rounded-full bg-primary-600 p-3 text-white shadow-lg hover:bg-primary-700"
+        className="fixed bottom-4 right-4 z-50 lg:hidden rounded-full bg-primary-600 p-4 text-white shadow-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 min-h-[56px] min-w-[56px] flex items-center justify-center"
+        aria-label="Toggle navigation menu"
+        aria-expanded={isMobileMenuOpen}
+        aria-controls="mobile-sidebar"
       >
-        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
@@ -123,15 +140,18 @@ export function DashboardSidebar() {
         <div
           className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
       <aside
+        id="mobile-sidebar"
         className={cn(
           'fixed inset-y-0 left-0 z-40 w-64 transform border-r bg-white transition-transform duration-300 ease-in-out lg:static lg:translate-x-0',
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         )}
+        aria-label="Main navigation"
       >
         <div className="flex h-full flex-col">
           {/* Organization Info */}
@@ -141,7 +161,7 @@ export function DashboardSidebar() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-1 overflow-y-auto p-4">
+          <nav className="flex-1 space-y-1 overflow-y-auto p-4" role="navigation" aria-label="Primary">
             {filteredNavigation.map((item) => (
               <Link
                 key={item.name}
@@ -153,13 +173,17 @@ export function DashboardSidebar() {
                     ? 'bg-primary-50 text-primary-700'
                     : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                 )}
+                aria-current={isActive(item.href) ? 'page' : undefined}
               >
                 <div className="flex items-center space-x-3">
-                  {item.icon}
+                  <span aria-hidden="true">{item.icon}</span>
                   <span>{item.name}</span>
                 </div>
                 {item.badge && item.badge > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-danger-600 text-xs text-white">
+                  <span
+                    className="flex h-5 w-5 items-center justify-center rounded-full bg-danger-600 text-xs text-white"
+                    aria-label={`${item.badge} items`}
+                  >
                     {item.badge}
                   </span>
                 )}

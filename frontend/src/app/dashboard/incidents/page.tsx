@@ -183,7 +183,7 @@ export default function IncidentsListPage() {
                           variant={
                             incident.severity === 'critical' ? 'danger' :
                             incident.severity === 'high' ? 'warning' :
-                            incident.severity === 'medium' ? 'info' : 'default'
+                            incident.severity === 'medium' ? 'info' : 'success'
                           }
                         >
                           {SEVERITY_CONFIG[incident.severity].label}

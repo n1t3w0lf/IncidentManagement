@@ -409,3 +409,52 @@ The application should display a professional landing page with:
 
 The foundation is now ready for the authentication system implementation in the next prompt.
 ```
+
+---
+
+## Microservices Architecture & Docker Deployment
+
+This application is designed to run as a **microservices architecture** with complete Docker containerization. After completing the initial setup, you can deploy the full production-ready system using Docker Compose.
+
+### Architecture Overview
+The system consists of:
+- **Frontend**: Next.js application (this setup)
+- **10 Microservices**: Auth, Incident, User, Notification, Organization, Analytics, File Storage, Workflow, Reporting, and API Gateway
+- **Infrastructure**: PostgreSQL (7 databases), Redis, RabbitMQ, Elasticsearch, MinIO, ClamAV, Prometheus, Grafana
+- **Zero Cloud Dependencies**: Everything runs in Docker containers
+
+### Quick Docker Deployment
+```bash
+# 1. Configure environment
+cp .env.example .env
+# Edit .env with your secure passwords
+
+# 2. Start all services
+docker-compose up -d
+
+# 3. Access application
+# Frontend: http://localhost:3000
+# API Gateway: http://localhost:4000
+```
+
+### Documentation
+- **Full Deployment Guide**: See [DEPLOYMENT_GUIDE.md](../DEPLOYMENT_GUIDE.md) for complete Docker deployment instructions
+- **Architecture Details**: See [MICROSERVICES_ARCHITECTURE.md](../MICROSERVICES_ARCHITECTURE.md) for system design
+- **Industry Use Cases**:
+  - Mining: [MINING_USE_CASES.md](./MINING_USE_CASES.md)
+  - Healthcare: [HEALTHCARE_USE_CASES.md](./HEALTHCARE_USE_CASES.md)
+  - Retail: [RETAIL_USE_CASES.md](./RETAIL_USE_CASES.md)
+
+### Development vs Production
+- **Development**: Follow this prompt to set up local development environment with MSW
+- **Production**: Use Docker Compose with microservices architecture (see deployment guide)
+- **Hybrid**: Run infrastructure in Docker, develop services locally
+
+The deployment guide includes:
+- Step-by-step Docker setup
+- Environment configuration
+- Service management
+- Monitoring and logging
+- Backup and recovery
+- Production security hardening
+- Troubleshooting guide

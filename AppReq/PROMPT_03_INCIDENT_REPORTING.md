@@ -1587,3 +1587,105 @@ TESTING THE IMPLEMENTATION:
 
 The core incident reporting functionality should be complete with industry-specific categories and comprehensive data collection capabilities.
 ```
+
+---
+
+## Microservices Architecture & Production Deployment
+
+This incident reporting system is designed for both **local development** (using MSW) and **production deployment** (using microservices).
+
+### Production Architecture
+In production, incident management is distributed across multiple microservices:
+
+#### Core Incident Services
+- **Incident Service** (Port 5002): CRUD operations, incident lifecycle management
+- **File Storage Service** (Port 5007): File uploads, virus scanning via ClamAV, MinIO storage
+- **Workflow Service** (Port 5008): Approval workflows, status transitions, escalations
+- **Notification Service** (Port 5004): Email/SMS notifications on incident events
+- **Analytics Service** (Port 5006): Incident analytics, reporting, dashboards
+
+#### Infrastructure
+- **incidents_db**: PostgreSQL database for incident data
+- **files_db**: PostgreSQL database for file metadata
+- **workflow_db**: PostgreSQL database for workflow rules
+- **MinIO**: S3-compatible object storage for attachments
+- **Elasticsearch**: Full-text search across incidents
+- **RabbitMQ**: Async event processing (incident.created, incident.updated, etc.)
+
+### Industry-Specific Deployment
+The system supports **three industry verticals** with specialized use cases:
+
+#### Mining Industry
+- 22 specialized use cases (equipment fires, injuries, near-misses, environmental incidents)
+- MSHA and OSHA compliance reporting
+- Underground location tracking
+- Equipment-specific incident categories
+- See: [MINING_USE_CASES.md](./MINING_USE_CASES.md)
+
+#### Healthcare Industry
+- 20 specialized use cases (medication errors, patient falls, device malfunctions)
+- HIPAA-compliant data handling
+- Joint Commission and FDA reporting
+- Patient de-identification
+- NCC MERP harm classification
+- See: [HEALTHCARE_USE_CASES.md](./HEALTHCARE_USE_CASES.md)
+
+#### Retail Industry
+- 20 specialized use cases (customer injuries, theft, equipment malfunctions)
+- OSHA workplace injury reporting
+- Customer PII protection
+- Store and location-specific tracking
+- See: [RETAIL_USE_CASES.md](./RETAIL_USE_CASES.md)
+
+### Deployment
+For production deployment with Docker:
+```bash
+# Start incident management services
+docker-compose up -d \
+  postgres-incidents postgres-files postgres-workflow \
+  incident-service file-storage-service workflow-service \
+  notification-service analytics-service \
+  minio clamav elasticsearch
+
+# Check service health
+curl http://localhost:5002/health  # Incident Service
+curl http://localhost:5007/health  # File Storage Service
+curl http://localhost:5008/health  # Workflow Service
+```
+
+### Event-Driven Architecture
+Incidents trigger asynchronous events via RabbitMQ:
+
+**Event Flow Example:**
+```
+1. User submits incident → Incident Service
+2. Incident Service publishes "incident.created" event → RabbitMQ
+3. Notification Service consumes event → sends email notifications
+4. Analytics Service consumes event → updates metrics
+5. Workflow Service consumes event → starts approval process (if required)
+```
+
+### File Upload Architecture
+```
+1. User uploads file → API Gateway → File Storage Service
+2. File Storage Service uploads to MinIO (S3-compatible)
+3. File metadata stored in files_db (PostgreSQL)
+4. ClamAV scans file for viruses
+5. Event published: "file.uploaded" or "file.quarantined"
+```
+
+### Multi-Tenancy & Data Isolation
+- Each organization's data is isolated by organizationId
+- Row-level security in PostgreSQL
+- Separate MinIO buckets per organization
+- Elasticsearch index per organization
+
+### Documentation
+- **Full Deployment Guide**: [DEPLOYMENT_GUIDE.md](../DEPLOYMENT_GUIDE.md)
+- **Architecture Details**: [MICROSERVICES_ARCHITECTURE.md](../MICROSERVICES_ARCHITECTURE.md)
+- **Industry Use Cases**:
+  - Mining: [MINING_USE_CASES.md](./MINING_USE_CASES.md)
+  - Healthcare: [HEALTHCARE_USE_CASES.md](./HEALTHCARE_USE_CASES.md)
+  - Retail: [RETAIL_USE_CASES.md](./RETAIL_USE_CASES.md)
+
+The development setup (MSW) provides rapid prototyping and frontend development, while the production microservices architecture provides scalability, reliability, and industry-specific compliance features.

@@ -1167,3 +1167,53 @@ TESTING THE IMPLEMENTATION:
 
 The authentication system should be complete and ready for the incident reporting implementation.
 ```
+
+---
+
+## Microservices Architecture & Production Deployment
+
+This authentication system is designed for both **local development** (using MSW) and **production deployment** (using microservices).
+
+### Production Architecture
+In production, authentication is handled by a dedicated **Auth Service** microservice:
+- **Auth Service** (Port 5001): JWT-based authentication and authorization
+- **User Service** (Port 5003): User profile management
+- **Organization Service** (Port 5005): Organization settings and configuration
+- **API Gateway** (Port 4000): Routes all requests, validates tokens
+
+### Database Architecture
+- **auth_db**: PostgreSQL database for users, roles, and permissions
+- **Redis**: Session management and token caching
+- Separate database instances for service isolation
+
+### Deployment
+For production deployment with Docker:
+```bash
+# Start authentication services
+docker-compose up -d postgres-auth redis api-gateway auth-service user-service organization-service
+
+# Check service health
+curl http://localhost:5001/health
+curl http://localhost:4000/health
+```
+
+### Migration from MSW to Production
+1. **Development**: Use MSW for local testing (this prompt)
+2. **Staging**: Deploy microservices with Docker Compose
+3. **Production**: Use same Docker setup with security hardening
+
+### Security Enhancements for Production
+- JWT secrets stored in Docker secrets
+- HTTPS/TLS termination at NGINX
+- Rate limiting at API Gateway
+- Database connection pooling
+- Token rotation and refresh
+- Password complexity requirements
+- Account lockout after failed attempts
+
+### Documentation
+- **Deployment Guide**: [DEPLOYMENT_GUIDE.md](../DEPLOYMENT_GUIDE.md)
+- **Architecture Details**: [MICROSERVICES_ARCHITECTURE.md](../MICROSERVICES_ARCHITECTURE.md)
+- **Security Configuration**: See deployment guide security section
+
+The development setup (MSW) allows you to work on the frontend independently, while the production setup provides a scalable, secure authentication system with proper service isolation.

@@ -1,0 +1,724 @@
+version: '3.9'
+
+services:
+  # ====================
+  # REVERSE PROXY / LOAD BALANCER
+  # ====================
+
+  nginx:
+    image: nginx:alpine
+    container_name: ims-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-cache:/var/cache/nginx
+    depends_on:
+      - api-gateway
+      - frontend
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ====================
+  # FRONTEND
+  # ====================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ims-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
+    depends_on:
+      - api-gateway
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ====================
+  # API GATEWAY
+  # ====================
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: ims-api-gateway
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - AUTH_SERVICE_URL=http://auth-service:5001
+      - INCIDENT_SERVICE_URL=http://incident-service:5002
+      - USER_SERVICE_URL=http://user-service:5003
+      - NOTIFICATION_SERVICE_URL=http://notification-service:5004
+      - ORGANIZATION_SERVICE_URL=http://organization-service:5005
+      - ANALYTICS_SERVICE_URL=http://analytics-service:5006
+      - FILE_STORAGE_SERVICE_URL=http://file-storage-service:5007
+      - WORKFLOW_SERVICE_URL=http://workflow-service:5008
+      - REPORTING_SERVICE_URL=http://reporting-service:5009
+    depends_on:
+      - redis
+      - auth-service
+      - incident-service
+      - user-service
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ====================
+  # MICROSERVICES
+  # ====================
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: ims-auth-service
+    ports:
+      - "5001:5001"
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD}@postgres-auth:5432/auth_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_EXPIRATION=15m
+      - JWT_REFRESH_EXPIRATION=7d
+      - BCRYPT_ROUNDS=12
+    depends_on:
+      - postgres-auth
+      - redis
+      - rabbitmq
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  incident-service:
+    build:
+      context: ./services/incident-service
+      dockerfile: Dockerfile
+    container_name: ims-incident-service
+    ports:
+      - "5002:5002"
+    environment:
+      - NODE_ENV=production
+      - PORT=5002
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD}@postgres-incidents:5432/incident_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+      - FILE_STORAGE_SERVICE_URL=http://file-storage-service:5007
+    depends_on:
+      - postgres-incidents
+      - redis
+      - elasticsearch
+      - rabbitmq
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 2
+
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: ims-user-service
+    ports:
+      - "5003:5003"
+    environment:
+      - NODE_ENV=production
+      - PORT=5003
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD}@postgres-auth:5432/auth_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+    depends_on:
+      - postgres-auth
+      - redis
+      - rabbitmq
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: ims-notification-service
+    ports:
+      - "5004:5004"
+    environment:
+      - NODE_ENV=production
+      - PORT=5004
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD}@postgres-notifications:5432/notification_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMS_API_KEY=${SMS_API_KEY}
+    depends_on:
+      - postgres-notifications
+      - redis
+      - rabbitmq
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 2
+
+  organization-service:
+    build:
+      context: ./services/organization-service
+      dockerfile: Dockerfile
+    container_name: ims-organization-service
+    ports:
+      - "5005:5005"
+    environment:
+      - NODE_ENV=production
+      - PORT=5005
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD}@postgres-auth:5432/auth_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+    depends_on:
+      - postgres-auth
+      - redis
+      - rabbitmq
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  analytics-service:
+    build:
+      context: ./services/analytics-service
+      dockerfile: Dockerfile
+    container_name: ims-analytics-service
+    ports:
+      - "5006:5006"
+    environment:
+      - NODE_ENV=production
+      - PORT=5006
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD}@postgres-analytics:5432/analytics_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+      - INCIDENT_SERVICE_URL=http://incident-service:5002
+    depends_on:
+      - postgres-analytics
+      - redis
+      - rabbitmq
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  file-storage-service:
+    build:
+      context: ./services/file-storage-service
+      dockerfile: Dockerfile
+    container_name: ims-file-storage-service
+    ports:
+      - "5007:5007"
+    environment:
+      - NODE_ENV=production
+      - PORT=5007
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD}@postgres-files:5432/file_db
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_USE_SSL=false
+      - CLAMAV_HOST=clamav
+      - CLAMAV_PORT=3310
+      - MAX_FILE_SIZE=10485760
+    depends_on:
+      - postgres-files
+      - minio
+      - clamav
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  workflow-service:
+    build:
+      context: ./services/workflow-service
+      dockerfile: Dockerfile
+    container_name: ims-workflow-service
+    ports:
+      - "5008:5008"
+    environment:
+      - NODE_ENV=production
+      - PORT=5008
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD}@postgres-workflow:5432/workflow_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+    depends_on:
+      - postgres-workflow
+      - redis
+      - rabbitmq
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  reporting-service:
+    build:
+      context: ./services/reporting-service
+      dockerfile: Dockerfile
+    container_name: ims-reporting-service
+    ports:
+      - "5009:5009"
+    environment:
+      - NODE_ENV=production
+      - PORT=5009
+      - DATABASE_URL=postgresql://ims_user:${POSTGRES_PASSWORD}@postgres-reporting:5432/reporting_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+      - FILE_STORAGE_SERVICE_URL=http://file-storage-service:5007
+    depends_on:
+      - postgres-reporting
+      - redis
+      - rabbitmq
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ====================
+  # DATABASES
+  # ====================
+
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: ims-postgres-auth
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=auth_db
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=en_US.UTF-8
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+      - ./scripts/init-auth-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ims_user -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-incidents:
+    image: postgres:15-alpine
+    container_name: ims-postgres-incidents
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=incident_db
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=en_US.UTF-8
+    volumes:
+      - postgres-incidents-data:/var/lib/postgresql/data
+      - ./scripts/init-incident-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ims_user -d incident_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-analytics:
+    image: timescale/timescaledb:latest-pg15
+    container_name: ims-postgres-analytics
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=analytics_db
+    volumes:
+      - postgres-analytics-data:/var/lib/postgresql/data
+      - ./scripts/init-analytics-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ims_user -d analytics_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-notifications:
+    image: postgres:15-alpine
+    container_name: ims-postgres-notifications
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=notification_db
+    volumes:
+      - postgres-notifications-data:/var/lib/postgresql/data
+      - ./scripts/init-notification-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ims_user -d notification_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-files:
+    image: postgres:15-alpine
+    container_name: ims-postgres-files
+    ports:
+      - "5436:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=file_db
+    volumes:
+      - postgres-files-data:/var/lib/postgresql/data
+      - ./scripts/init-file-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ims_user -d file_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-workflow:
+    image: postgres:15-alpine
+    container_name: ims-postgres-workflow
+    ports:
+      - "5437:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=workflow_db
+    volumes:
+      - postgres-workflow-data:/var/lib/postgresql/data
+      - ./scripts/init-workflow-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ims_user -d workflow_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-reporting:
+    image: postgres:15-alpine
+    container_name: ims-postgres-reporting
+    ports:
+      - "5438:5432"
+    environment:
+      - POSTGRES_USER=ims_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=reporting_db
+    volumes:
+      - postgres-reporting-data:/var/lib/postgresql/data
+      - ./scripts/init-reporting-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ims_user -d reporting_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ====================
+  # CACHE & MESSAGE BROKER
+  # ====================
+
+  redis:
+    image: redis:7-alpine
+    container_name: ims-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ims-rabbitmq
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+      - RABBITMQ_DEFAULT_VHOST=/
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ====================
+  # SEARCH & STORAGE
+  # ====================
+
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: ims-elasticsearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: ims-minio
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ====================
+  # SECURITY
+  # ====================
+
+  clamav:
+    image: clamav/clamav:latest
+    container_name: ims-clamav
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav-data:/var/lib/clamav
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 60s
+      timeout: 120s
+      retries: 3
+
+  # ====================
+  # MONITORING
+  # ====================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ims-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ims-grafana
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=redis-datasource
+      - GF_SERVER_ROOT_URL=http://localhost:3002
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - ims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ====================
+# VOLUMES
+# ====================
+
+volumes:
+  postgres-auth-data:
+    driver: local
+  postgres-incidents-data:
+    driver: local
+  postgres-analytics-data:
+    driver: local
+  postgres-notifications-data:
+    driver: local
+  postgres-files-data:
+    driver: local
+  postgres-workflow-data:
+    driver: local
+  postgres-reporting-data:
+    driver: local
+  redis-data:
+    driver: local
+  rabbitmq-data:
+    driver: local
+  elasticsearch-data:
+    driver: local
+  minio-data:
+    driver: local
+  clamav-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  nginx-cache:
+    driver: local
+
+# ====================
+# NETWORKS
+# ====================
+
+networks:
+  ims-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
